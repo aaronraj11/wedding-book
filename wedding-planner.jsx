@@ -250,6 +250,7 @@ export default function WeddingApp() {
   const [session, setSession] = useState(undefined); // undefined = checking, null = logged out
   const [theme, setTheme] = useState("light");
   const [guestMode, setGuestMode] = useState(null); // null | "checkin" | "rsvp"
+  const [guestLock, setGuestLock] = useState(false); // true when opened via a ?p= link — kiosk mode, no way out
   const [adminMode, setAdminMode] = useState(false);
 
   // swap the palette in place before children render
@@ -274,9 +275,12 @@ export default function WeddingApp() {
           const r = await window.storage.get(WEDDING_KEY);
           w = r && r.value ? r.value : null;
         }
-        // ?p=rsvp or ?p=checkin jumps straight to the guest page
+        // ?p=rsvp or ?p=checkin locks the page to that guest function (kiosk mode)
         const p = (params.get("p") || "").toLowerCase();
-        if (w && (p === "rsvp" || p === "checkin")) setGuestMode(p);
+        if (w && (p === "rsvp" || p === "checkin")) {
+          setGuestMode(p);
+          setGuestLock(true);
+        }
       } catch (e) {
         w = null;
       }
@@ -355,8 +359,8 @@ export default function WeddingApp() {
   if (adminMode)
     return <AdminPanel onExit={() => setAdminMode(false)} onEnter={enterWedding} theme={theme} toggleTheme={toggleTheme} />;
   if (!wedding) return <WeddingGate onOpen={openWedding} theme={theme} toggleTheme={toggleTheme} onAdmin={() => setAdminMode(true)} />;
-  if (guestMode === "checkin") return <GuestCheckIn onBack={() => setGuestMode(null)} theme={theme} />;
-  if (guestMode === "rsvp") return <GuestRSVP onBack={() => setGuestMode(null)} theme={theme} />;
+  if (guestMode === "checkin") return <GuestCheckIn onBack={() => setGuestMode(null)} theme={theme} locked={guestLock} />;
+  if (guestMode === "rsvp") return <GuestRSVP onBack={() => setGuestMode(null)} theme={theme} locked={guestLock} />;
   if (!session)
     return (
       <Login
@@ -911,7 +915,7 @@ function Login({ onLogin, theme, toggleTheme, onGuest, onRsvp, onSwitch, wedding
 }
 
 // ---------- guest check-in kiosk ----------
-function GuestCheckIn({ onBack, theme }) {
+function GuestCheckIn({ onBack, theme, locked }) {
   const [data, setData] = useState(null);
   const [search, setSearch] = useState("");
   const [sel, setSel] = useState(null);
@@ -1134,21 +1138,23 @@ function GuestCheckIn({ onBack, theme }) {
           </Card>
         )}
 
-        <p className="text-xs text-center mt-4">
-          <button
-            onClick={onBack}
-            style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", textDecoration: "underline" }}
-          >
-            Planner sign-in
-          </button>
-        </p>
+        {!locked && (
+          <p className="text-xs text-center mt-4">
+            <button
+              onClick={onBack}
+              style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", textDecoration: "underline" }}
+            >
+              Planner sign-in
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
 // ---------- guest rsvp by link ----------
-function GuestRSVP({ onBack, theme }) {
+function GuestRSVP({ onBack, theme, locked }) {
   const [data, setData] = useState(null);
   const [search, setSearch] = useState("");
   const [sel, setSel] = useState(null);
@@ -1342,14 +1348,16 @@ function GuestRSVP({ onBack, theme }) {
           </Card>
         )}
 
-        <p className="text-xs text-center mt-4">
-          <button
-            onClick={onBack}
-            style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", textDecoration: "underline" }}
-          >
-            Planner sign-in
-          </button>
-        </p>
+        {!locked && (
+          <p className="text-xs text-center mt-4">
+            <button
+              onClick={onBack}
+              style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", textDecoration: "underline" }}
+            >
+              Planner sign-in
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );
@@ -2440,10 +2448,20 @@ function DataPanel({ data, up }) {
           from. The tools below give you a physical copy: backups you can keep, an Excel file you can print or send to
           your venue, and a quick way to import a guest list you already have.
         </p>
-        <p className="text-sm mt-2">
-          <span style={{ color: C.muted }}>Share this link with your team and guests — it opens your wedding directly: </span>
-          <b style={{ color: C.ink, wordBreak: "break-all" }}>{`${location.origin}${location.pathname}?w=${WEDDING}`}</b>
-        </p>
+        <div className="text-sm mt-3 grid gap-1" style={{ wordBreak: "break-all" }}>
+          <div>
+            <span style={{ color: C.muted }}>👥 Team link (opens your wedding's sign-in): </span>
+            <b style={{ color: C.ink }}>{`${location.origin}${location.pathname}?w=${WEDDING}`}</b>
+          </div>
+          <div>
+            <span style={{ color: C.muted }}>💌 RSVP link for guests (locked — they see only the RSVP page): </span>
+            <b style={{ color: C.ink }}>{`${location.origin}${location.pathname}?w=${WEDDING}&p=rsvp`}</b>
+          </div>
+          <div>
+            <span style={{ color: C.muted }}>🎟️ Check-in link for the door (locked — kiosk mode for a tablet/laptop): </span>
+            <b style={{ color: C.ink }}>{`${location.origin}${location.pathname}?w=${WEDDING}&p=checkin`}</b>
+          </div>
+        </div>
       </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
