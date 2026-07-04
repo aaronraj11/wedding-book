@@ -191,6 +191,46 @@ function MemberRows({ members, onChange }) {
   );
 }
 
+// styled group picker: preset + existing groups in a normal select, with an "Other" escape hatch for custom tags
+function GroupSelect({ value, options, onChange }) {
+  const [custom, setCustom] = useState(() => value !== "" && !options.includes(value));
+  const showCustom = custom || (value !== "" && !options.includes(value));
+  return (
+    <div className="flex gap-2 items-center flex-wrap" style={{ width: "100%" }}>
+      <select
+        style={{ ...inputStyle, width: showCustom ? 150 : "100%", minWidth: 130, flex: showCustom ? "0 0 auto" : "1" }}
+        value={showCustom ? "__other__" : value}
+        onChange={(e) => {
+          if (e.target.value === "__other__") {
+            setCustom(true);
+            onChange("");
+          } else {
+            setCustom(false);
+            onChange(e.target.value);
+          }
+        }}
+      >
+        <option value="">— no group —</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+        <option value="__other__">✏️ Other — type my own…</option>
+      </select>
+      {showCustom && (
+        <input
+          style={{ ...inputStyle, flex: 1, minWidth: 150 }}
+          value={value}
+          autoFocus
+          placeholder="Your own tag, e.g. Pastors from FGA (use / to nest)"
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+    </div>
+  );
+}
+
 const inputStyle = {
   get border() {
     return `1px solid ${C.line}`;
@@ -2117,11 +2157,6 @@ function Guests({ data, up, side }) {
 
   return (
     <div className="grid gap-4">
-      <datalist id="group-suggestions">
-        {groupOptions.map((o) => (
-          <option key={o} value={o} />
-        ))}
-      </datalist>
       <Card>
         <div style={{ ...serif, fontSize: 20, fontWeight: 600 }} className="mb-3">
           Add a guest {side && <Pill tone={side === "bride" ? "gold" : "green"}>{cap(side)}'s side</Pill>}
@@ -2144,13 +2179,7 @@ function Guests({ data, up, side }) {
             </Field>
           )}
           <Field label="Group / relation" className="md:col-span-2">
-            <input
-              style={inputStyle}
-              list="group-suggestions"
-              value={form.group}
-              onChange={(e) => setForm({ ...form, group: e.target.value })}
-              placeholder="Immediate family, Friends, Pastors from FGA… — pick or type your own"
-            />
+            <GroupSelect value={form.group} options={groupOptions} onChange={(v) => setForm({ ...form, group: v })} />
           </Field>
         </div>
 
@@ -2392,8 +2421,8 @@ function Guests({ data, up, side }) {
                   </select>
                 </Field>
               )}
-              <Field label="Group / relation">
-                <input style={{ ...inputStyle, width: 230 }} list="group-suggestions" value={g.group || ""} onChange={(e) => patch(g.id, { group: e.target.value })} placeholder="Immediate family, Friends, or your own" />
+              <Field label="Group / relation" className="min-w-72">
+                <GroupSelect value={g.group || ""} options={groupOptions} onChange={(v) => patch(g.id, { group: v })} />
               </Field>
               {membersOf(g).length === 0 && (
                 <Field label="Invited pax">
