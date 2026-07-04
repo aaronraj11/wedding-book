@@ -1,0 +1,69 @@
+# Wedding Book 💍
+
+A wedding planning web app for couples and their helpers — guest lists, RSVPs, catering headcounts, budget tracking, gift money, and a guest-facing check-in kiosk. Built for Malaysian weddings (RM currency, WhatsApp invitations, DuitNow QR gifts) but usable anywhere.
+
+**Live app:** https://aaron-wedding-book.netlify.app
+
+## How it's used
+
+Each wedding gets its own **wedding code** (like a private room name). Opening the site the first time asks you to create a wedding or enter a code. A wedding has four planner roles, each with its own passcode:
+
+| Role | Access |
+|---|---|
+| Bride / Groom | Everything — guests, catering, budget, gifts, data tools |
+| Bride's / Groom's Accountant | Their side's guest list, RSVPs, and gift money |
+
+Deep-link a specific wedding with `?w=<code>` — e.g. `https://…netlify.app?w=aaron-joan`. Guests use the same link and tap **Guest check-in** (no passcode) to say how many people arrived and optionally pledge a monetary gift by cash or QR.
+
+## Features
+
+- **Guests & RSVP** — invites with pax and baby counts, per-event tagging, editable cards, nested family-tree view (use `/` in a group name: `Dad's family / Uncle Ravi's family`), group autocomplete, duplicate-name protection, Excel/CSV import
+- **WhatsApp invitations** — personalised message template with a one-tap send queue
+- **Catering** — eating-pax headcount (babies excluded) per event with a buffer %, per-table vs per-head quote comparison
+- **Budget** — vendors by category and event, budgeted/total/paid tracking, due dates with overdue flags, refundable deposits
+- **Gift money** — record angpow per guest plus off-list gifts, split by side; guest check-in pledges shown for reconciliation
+- **Guest check-in kiosk** — arrival headcount tallied against RSVPs (mismatches flagged red), cash/QR gift flow showing the couple's uploaded QR image
+- **Data tools** — Excel workbook export (Guests, Budget, Other Gifts, Caterers), JSON backup/restore, gift-QR upload
+- **Master control** — hidden admin panel (see the `Admin` link on the wedding-code screen) listing every registered wedding with live stats and full-access entry
+- Light/dark theme, mobile-friendly
+
+## Architecture
+
+Deliberately simple — no build step, no server:
+
+- **`wedding-planner.jsx`** — the entire app as one React component file. This is the source of truth for app code.
+- **`index.html`** — self-contained page that loads React, Babel, SheetJS, and Tailwind from CDNs and transpiles the JSX in the browser. Contains the Firebase config and a small `window.storage` adapter.
+- **`deploy/index.html`** — copy of `index.html`; this folder is what gets published (keeps the `.jsx` source out of the deployed site).
+- **Storage** — Firebase Firestore (project `wedding-planner-992a3`), anonymous auth. All docs live in the `kv` collection as `{ value: <JSON string> }`:
+  - `w:<code>:data` — one wedding's full planning data
+  - `w:<code>:accounts` — that wedding's role passcode hashes
+  - `w:<code>:meta` — registration record (couple, created date)
+  - `registry` — list of all weddings, read by master control
+- Sessions, theme, and last-opened wedding stay in `localStorage` per device.
+
+After editing `wedding-planner.jsx`, rebuild `index.html` by splicing the JSX between the HTML header (everything through `<script type="text/plain" id="app-src">`) and footer (from `const root = ReactDOM.createRoot…`), replacing line 1–2 imports with `const { useState, useEffect, useRef, useMemo } = React;` and dropping the `export default`. Then copy to `deploy/index.html`.
+
+## Firebase setup (for a fresh deployment)
+
+1. Create a Firebase project, add a **web app**, and paste its config into the `firebaseConfig` object in `index.html`
+2. **Authentication → Sign-in method → enable Anonymous**
+3. **Firestore Database → create**, then publish these rules:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /kv/{doc} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+## Deploying
+
+Hosted on Netlify. Either drag the `deploy` folder onto the site's **Deploys** page, or connect this GitHub repo with **publish directory = `deploy`** (no build command) for automatic deploys on every push.
+
+## Security model (honest version)
+
+This is a trust-your-team app, not a bank. Everything runs client-side: wedding codes act as space keys, role passcodes and admin credentials are stored as light hashes (not plain text, but not strong cryptography either), and the Firestore rules let any anonymous visitor of the app read/write the `kv` collection. Fine for family and friends planning a wedding; if it ever becomes a public product, move to real server-side auth (Firebase email accounts + per-wedding membership rules).
