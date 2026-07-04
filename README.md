@@ -2,7 +2,7 @@
 
 A wedding planning web app for couples and their helpers — guest lists, RSVPs, catering headcounts, budget tracking, gift money, and a guest-facing check-in kiosk. Built for Malaysian weddings (RM currency, WhatsApp invitations, DuitNow QR gifts) but usable anywhere.
 
-**Live app:** https://aaron-wedding-book.netlify.app
+**Live app:** https://wedding-book.aaronraj.workers.dev
 
 ## How it's used
 
@@ -66,7 +66,7 @@ service cloud.firestore {
 
 ## Deploying
 
-Hosted on Netlify. Either drag the `deploy` folder onto the site's **Deploys** page, or connect this GitHub repo with **publish directory = `deploy`** (no build command) for automatic deploys on every push.
+Hosted on Cloudflare Workers (static assets). The repo is connected to Cloudflare Builds: every push to `main` runs `npx wrangler deploy`, which publishes the `deploy/` folder per `wrangler.jsonc`. (Previously on Netlify at aaron-wedding-book.netlify.app — abandoned after its credit-based free tier ran out.)
 
 ## Security model (honest version)
 
