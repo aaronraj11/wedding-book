@@ -100,7 +100,18 @@ const asMember = (m) => (typeof m === "string" ? { name: m, type: "adult" } : { 
 const membersOf = (g) => (g.members || []).map(asMember).filter((m) => m.name && m.name.trim());
 const babyCount = (list) => list.filter((m) => m.type === "baby").length;
 
-const GROUP_PRESETS = ["Immediate family", "Extended family", "Friends", "Colleagues", "Church family", "Neighbours"];
+const GROUP_PRESETS = [
+  "Immediate family",
+  "Immediate family / Mom's side",
+  "Immediate family / Dad's side",
+  "Extended family",
+  "Extended family / Mom's side",
+  "Extended family / Dad's side",
+  "Friends",
+  "Colleagues",
+  "Church family",
+  "Neighbours",
+];
 
 const defaultEvents = (settings) => [{ id: "ev-" + uid(), name: "Wedding Day", icon: "💒", date: (settings && settings.date) || "" }];
 
