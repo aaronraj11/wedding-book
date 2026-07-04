@@ -1138,6 +1138,14 @@ function GuestCheckIn({ onBack, theme, locked }) {
               {sel.name} · {num(pax)} pax{num(babies) > 0 ? ` (${num(babies)} 👶)` : ""}
               {giftIntent === "yes" && num(amount) > 0 ? ` · gift ${RM(amount)} (${method === "qr" ? "QR" : "cash"})` : ""}
             </p>
+            <div className="mt-3 p-3" style={{ background: C.goldSoft, border: `1px solid ${C.gold}`, borderRadius: 10 }}>
+              <div className="text-sm font-semibold" style={{ color: C.gold }}>
+                🎗️ Please collect {num(pax) > 1 ? `your ${num(pax)} wrist bands` : "your wrist band"} from the usher
+              </div>
+              <div className="text-xs mt-1" style={{ color: C.muted }}>
+                Wrist bands are required to enter the wedding hall — one per person.
+              </div>
+            </div>
             {giftIntent === "yes" && method === "qr" && qrBlock}
             <p className="text-sm mt-3" style={{ color: C.muted }}>Enjoy the celebration! 🥂</p>
             <div className="mt-4">
@@ -1614,8 +1622,8 @@ function GuestRSVP({ onBack, theme, locked }) {
                     </p>
                   </>
                 )}
-                <Field label="Dietary needs / notes (optional)">
-                  <input style={inputStyle} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Vegetarian, halal, no beef, baby chair…" />
+                <Field label="Notes (optional)">
+                  <input style={inputStyle} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Halal, allergies, baby chair, anything we should know…" />
                 </Field>
               </div>
             )}
@@ -2605,8 +2613,8 @@ function Guests({ data, up, side }) {
                 </b>{" "}
                 eating pax for catering
               </div>
-              <Field label="Dietary / notes" className="flex-1 min-w-40">
-                <input style={inputStyle} value={g.dietary} onChange={(e) => patch(g.id, { dietary: e.target.value })} placeholder="Vegetarian, halal, no beef, kids' seats…" />
+              <Field label="Notes" className="flex-1 min-w-40">
+                <input style={inputStyle} value={g.dietary} onChange={(e) => patch(g.id, { dietary: e.target.value })} placeholder="Halal, allergies, kids' seats…" />
               </Field>
             </div>
           )}
