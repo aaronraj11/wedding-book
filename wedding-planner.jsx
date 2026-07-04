@@ -2033,6 +2033,8 @@ function Guests({ data, up, side }) {
   }, [data.guests]);
 
   const dupName = form.name.trim() !== "" && data.guests.some((g) => g.name.trim().toLowerCase() === form.name.trim().toLowerCase());
+  const formMembers = form.members.map(asMember).filter((m) => m.name.trim());
+  const formBabies = babyCount(formMembers);
 
   const add = () => {
     if (!form.name.trim() || dupName) return;
@@ -2125,8 +2127,8 @@ function Guests({ data, up, side }) {
           Add a guest {side && <Pill tone={side === "bride" ? "gold" : "green"}>{cap(side)}'s side</Pill>}
         </div>
         <div className="grid md:grid-cols-6 gap-3 items-end">
-          <Field label="Name" className="md:col-span-2">
-            <input style={inputStyle} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Uncle Lim & family" onKeyDown={(e) => e.key === "Enter" && add()} />
+          <Field label="Family / invite name" className="md:col-span-2">
+            <input style={inputStyle} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Gabriel Paul's Family" onKeyDown={(e) => e.key === "Enter" && add()} />
             {dupName && (
               <span className="text-xs" style={{ color: C.red }}>
                 Already on the guest list — change the name to avoid a duplicate.
@@ -2150,11 +2152,6 @@ function Guests({ data, up, side }) {
               placeholder="Immediate family, Friends, Pastors from FGA… — pick or type your own"
             />
           </Field>
-          {form.members.map(asMember).filter((m) => m.name.trim()).length === 0 && (
-            <Field label="Invited pax">
-              <input style={inputStyle} type="number" min="1" value={form.invitedPax} onChange={(e) => setForm({ ...form, invitedPax: e.target.value })} />
-            </Field>
-          )}
         </div>
 
         <div className="mt-3 p-3" style={{ background: C.soft, border: `1px dashed ${C.line}`, borderRadius: 10 }}>
@@ -2163,10 +2160,22 @@ function Guests({ data, up, side }) {
           </div>
           <MemberRows members={form.members} onChange={(rows) => setForm({ ...form, members: rows })} />
           <p className="text-xs mt-2" style={{ color: C.muted }}>
-            One box per person — mark each as an adult or a baby 👶. Babies are part of the invite but excluded from
-            the catering headcount. The pax count follows these boxes automatically. (No names? Leave this empty and
-            just set an invited-pax number.)
+            One box per person, <b>including the family head</b> — e.g. for "Gabriel Paul's Family", add Gabriel Paul
+            himself as a member too. Mark each as adult or baby 👶 (babies are excluded from catering). The pax count
+            follows these boxes automatically.
           </p>
+          {formMembers.length === 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs" style={{ color: C.muted }}>Not naming people? Just set the pax count:</span>
+              <input
+                style={{ ...inputStyle, width: 80, padding: "4px 8px" }}
+                type="number"
+                min="1"
+                value={form.invitedPax}
+                onChange={(e) => setForm({ ...form, invitedPax: e.target.value })}
+              />
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-5 gap-3 items-end mt-3">
@@ -2174,20 +2183,22 @@ function Guests({ data, up, side }) {
             <input style={inputStyle} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="e.g. 012-345 6789" />
           </Field>
           <div className="md:col-span-2 pb-2 text-sm" style={{ color: C.muted }}>
-            {form.members.map(asMember).filter((m) => m.name.trim()).length > 0 && (
-              <>
-                This invite:{" "}
-                <b style={{ color: C.green }}>
-                  {form.members.map(asMember).filter((m) => m.name.trim()).length} pax
-                  {babyCount(form.members.map(asMember).filter((m) => m.name.trim())) > 0
-                    ? ` · ${babyCount(form.members.map(asMember).filter((m) => m.name.trim()))} 👶`
-                    : ""}
-                </b>
-              </>
+            This invite:{" "}
+            <b style={{ color: C.green }}>
+              {formMembers.length > 0
+                ? `${formMembers.length} pax${formBabies > 0 ? ` · ${formBabies} 👶` : ""}`
+                : `${num(form.invitedPax) || 1} pax`}
+            </b>
+            {!form.name.trim() && (
+              <span className="text-xs" style={{ color: C.red }}>
+                {" "}— fill in the family / invite name above first
+              </span>
             )}
           </div>
           <div>
-            <Btn onClick={add}>Add guest</Btn>
+            <Btn onClick={add} disabled={!form.name.trim() || dupName}>
+              Add guest
+            </Btn>
           </div>
         </div>
         <p className="text-xs mt-2" style={{ color: C.muted }}>
