@@ -13,7 +13,7 @@ Each wedding gets its own **wedding code** (like a private room name). Opening t
 | Bride / Groom | Everything — guests, catering, budget, gifts, data tools |
 | Bride's / Groom's Accountant | Their side's guest list, RSVPs, and gift money |
 
-Deep-link a specific wedding with `?w=<code>` — e.g. `https://…netlify.app?w=aaron-joan`. Guests use the same link and tap **Guest check-in** (no passcode) to say how many people arrived and optionally pledge a monetary gift by cash or QR.
+Deep-link a specific wedding with `?w=<code>` — e.g. `https://wedding-book.aaronraj.workers.dev?w=aaron-joan`. Guests use the locked kiosk links (`&p=rsvp` / `&p=checkin`) to reply to their invitation or check in on the day, including an optional cash/QR monetary gift pledge.
 
 ## Features
 
@@ -66,7 +66,7 @@ service cloud.firestore {
 
 ## Deploying
 
-Hosted on Cloudflare Workers (static assets). The repo is connected to Cloudflare Builds: every push to `main` runs `npx wrangler deploy`, which publishes the `deploy/` folder per `wrangler.jsonc`. (Previously on Netlify at aaron-wedding-book.netlify.app — abandoned after its credit-based free tier ran out.)
+Hosted on Cloudflare Workers (static assets). The repo is connected to Cloudflare Builds: every push to `main` runs `npx wrangler deploy`, which publishes the `deploy/` folder per `wrangler.jsonc`.
 
 ## Security model (honest version)
 
