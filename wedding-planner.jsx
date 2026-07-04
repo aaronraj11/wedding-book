@@ -350,8 +350,14 @@ function Stat({ label, value, sub, tone }) {
 const GlobalStyle = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Jost:wght@400;500;600&display=swap');
-    body { font-family: 'Jost', system-ui, sans-serif; }
+    html, body { background: ${C.ivory}; margin: 0; }
+    body {
+      font-family: 'Jost', system-ui, sans-serif;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
     input:focus, select:focus, textarea:focus { border-color: ${C.gold} !important; }
+    /* 16px stops iOS Safari zooming into focused fields */
+    @media (max-width: 640px) { input, select, textarea { font-size: 16px !important; } }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   `}</style>
 );
@@ -368,6 +374,12 @@ export default function WeddingApp() {
   // swap the palette in place before children render
   Object.assign(C, theme === "dark" ? DARK : LIGHT);
   WEDDING = wedding || null;
+
+  // keep the phone status-bar colour in step with the theme
+  useEffect(() => {
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute("content", theme === "dark" ? "#161815" : "#2E4A35");
+  }, [theme]);
 
   useEffect(() => {
     (async () => {
