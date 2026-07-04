@@ -100,6 +100,16 @@ const asMember = (m) => (typeof m === "string" ? { name: m, type: "adult" } : { 
 const membersOf = (g) => (g.members || []).map(asMember).filter((m) => m.name && m.name.trim());
 const babyCount = (list) => list.filter((m) => m.type === "baby").length;
 
+// vegetarian meals needed for one invite (babies don't get a meal)
+const vegOf = (g) => {
+  const mm = membersOf(g);
+  if (mm.length) {
+    const coming = g.rsvp === "yes" && Array.isArray(g.confirmedMembers) ? mm.filter((m) => g.confirmedMembers.includes(m.name)) : mm;
+    return coming.filter((m) => m.diet === "veg" && m.type !== "baby").length;
+  }
+  return num(g.confirmedVeg);
+};
+
 const GROUP_PRESETS = [
   "Immediate family",
   "Immediate family / Mom's side",
@@ -187,6 +197,12 @@ function MemberRows({ members, onChange }) {
             <option value="adult">Adult</option>
             <option value="baby">Baby 👶</option>
           </select>
+          {(m.type || "adult") !== "baby" && (
+            <select style={{ ...inputStyle, width: 140 }} value={m.diet || "non"} onChange={(e) => set(i, { diet: e.target.value })}>
+              <option value="non">Non-vegetarian</option>
+              <option value="veg">Vegetarian 🥗</option>
+            </select>
+          )}
           <Btn kind="danger" small onClick={() => removeRow(i)}>
             ✕
           </Btn>
@@ -1311,6 +1327,8 @@ function GuestRSVP({ onBack, theme, locked }) {
   const [babies, setBabies] = useState("");
   const [dietary, setDietary] = useState("");
   const [selMembers, setSelMembers] = useState([]);
+  const [memberDiets, setMemberDiets] = useState({}); // name -> "non" | "veg"
+  const [vegCount, setVegCount] = useState(""); // for invites without named members
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState("");
@@ -1352,6 +1370,8 @@ function GuestRSVP({ onBack, theme, locked }) {
     setSelMembers(
       Array.isArray(g.confirmedMembers) ? g.confirmedMembers.filter((m) => names.includes(m)) : [...names]
     );
+    setMemberDiets(Object.fromEntries(membersOf(g).map((m) => [m.name, m.diet || "non"])));
+    setVegCount(String(num(g.confirmedVeg) || 0));
     setErr("");
   };
 
@@ -1383,7 +1403,12 @@ function GuestRSVP({ onBack, theme, locked }) {
                 confirmedBabies: String(num(babies)),
                 dietary: dietary.trim(),
                 rsvpAt: Date.now(),
-                ...(membersOf(sel).length > 0 ? { confirmedMembers: selMembers } : {}),
+                ...(membersOf(sel).length > 0
+                  ? {
+                      confirmedMembers: selMembers,
+                      members: membersOf(g).map((m) => ({ ...m, diet: memberDiets[m.name] || m.diet || "non" })),
+                    }
+                  : { confirmedVeg: Math.min(num(vegCount), num(pax) || 1) }),
               }
             : { ...g, rsvp: "no", confirmedPax: "", confirmedBabies: "", rsvpAt: Date.now() }
           : g
@@ -1532,6 +1557,43 @@ function GuestRSVP({ onBack, theme, locked }) {
                       Coming: <b style={{ color: C.green }}>{selMembers.length} pax</b>
                       {num(babies) > 0 ? ` · ${num(babies)} 👶 (babies aren't counted for food)` : ""}
                     </p>
+                    {membersOf(sel).filter((m) => selMembers.includes(m.name) && m.type !== "baby").length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-sm font-semibold mb-2">Meal preference 🍽</div>
+                        <div className="grid gap-2">
+                          {membersOf(sel)
+                            .filter((m) => selMembers.includes(m.name) && m.type !== "baby")
+                            .map((m) => (
+                              <div key={m.name} className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm" style={{ minWidth: 120 }}>
+                                  {m.name}
+                                </span>
+                                {[["non", "Non-vegetarian"], ["veg", "Vegetarian 🥗"]].map(([k, label]) => {
+                                  const on = (memberDiets[m.name] || "non") === k;
+                                  return (
+                                    <button
+                                      key={k}
+                                      onClick={() => setMemberDiets({ ...memberDiets, [m.name]: k })}
+                                      style={{
+                                        padding: "4px 12px",
+                                        borderRadius: 999,
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        border: `1px solid ${on ? C.green : C.line}`,
+                                        background: on ? C.greenSoft : C.card,
+                                        color: on ? C.green : C.muted,
+                                      }}
+                                    >
+                                      {label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -1541,6 +1603,9 @@ function GuestRSVP({ onBack, theme, locked }) {
                       </Field>
                       <Field label="…of which babies 👶">
                         <input style={{ ...inputStyle, width: 110 }} type="number" min="0" value={babies} onChange={(e) => setBabies(e.target.value)} />
+                      </Field>
+                      <Field label="…vegetarian meals 🥗">
+                        <input style={{ ...inputStyle, width: 110 }} type="number" min="0" value={vegCount} onChange={(e) => setVegCount(e.target.value)} />
                       </Field>
                     </div>
                     <p className="text-xs" style={{ color: C.muted, marginTop: -4 }}>
@@ -2434,6 +2499,7 @@ function Guests({ data, up, side }) {
                     {coming === true ? "✓ " : ""}
                     {m.name}
                     {m.type === "baby" ? " 👶" : ""}
+                    {m.diet === "veg" ? " 🥗" : ""}
                   </button>
                 );
               })}
@@ -2588,13 +2654,14 @@ function DataPanel({ data, up }) {
       Group: g.group || "",
       "Invited Pax": num(g.invitedPax),
       Babies: num(g.invitedBabies),
-      Members: membersOf(g).map((m) => m.name + (m.type === "baby" ? " (baby)" : "")).join(", "),
+      Members: membersOf(g).map((m) => m.name + (m.type === "baby" ? " (baby)" : "") + (m.diet === "veg" ? " (veg)" : "")).join(", "),
       Phone: g.phone || "",
       "Invited To": !g.events || g.events.length === 0 ? "All events" : (data.events || []).filter((e) => g.events.includes(e.id)).map((e) => e.name).join(", "),
       RSVP: g.rsvp === "yes" ? "Attending" : g.rsvp === "no" ? "Declined" : "Pending",
       "Confirmed Pax": g.rsvp === "yes" ? num(g.confirmedPax || g.invitedPax) : "",
       "Confirmed Babies": g.rsvp === "yes" ? (g.confirmedBabies === "" || g.confirmedBabies === undefined ? num(g.invitedBabies) : num(g.confirmedBabies)) : "",
       "Confirmed Members": g.rsvp === "yes" && Array.isArray(g.confirmedMembers) ? g.confirmedMembers.join(", ") : "",
+      "Vegetarian Meals": g.rsvp === "yes" ? vegOf(g) || "" : "",
       Dietary: g.dietary || "",
       "Invite Sent": g.invitedAt ? new Date(g.invitedAt).toLocaleDateString("en-MY") : "",
       "Checked In Pax": g.checkedInAt ? num(g.checkedInPax) : "",
@@ -3094,6 +3161,7 @@ function GuestLeaf({ g }) {
                   {i > 0 ? ", " : "└ "}
                   {m.name}
                   {m.type === "baby" ? " 👶" : ""}
+                  {m.diet === "veg" ? " 🥗" : ""}
                   {coming === true ? " ✓" : ""}
                 </span>
               );
@@ -3247,6 +3315,7 @@ function Catering({ data, up, stats }) {
   const usingConfirmed = attending.length > 0;
   const basePax = usingConfirmed ? calcEating(attending, true) : calcEating(pool, false);
   const babies = usingConfirmed ? calcBabies(attending, true) : calcBabies(pool, false);
+  const vegMeals = (usingConfirmed ? attending : pool).reduce((s, g) => s + vegOf(g), 0);
   const buffer = num(data.bufferPct);
   const plannedPax = Math.ceil(basePax * (1 + buffer / 100));
   const selEventObj = events.find((e) => e.id === selEvent);
@@ -3309,6 +3378,11 @@ function Catering({ data, up, stats }) {
           {babies > 0 && (
             <>
               {" "}· <b style={{ color: C.gold }}>{babies} 👶 excluded</b> from food count
+            </>
+          )}
+          {vegMeals > 0 && (
+            <>
+              {" "}· <b style={{ color: C.green }}>{vegMeals} 🥗 vegetarian</b>
             </>
           )}
         </p>
