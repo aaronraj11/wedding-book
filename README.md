@@ -17,15 +17,19 @@ Deep-link a specific wedding with `?w=<code>` — e.g. `https://…netlify.app?w
 
 ## Features
 
+- **Live sync** — edits appear on everyone's screen in real time (Firestore listeners)
 - **Guests & RSVP** — invites with pax and baby counts, per-event tagging, editable cards, nested family-tree view (use `/` in a group name: `Dad's family / Uncle Ravi's family`), group autocomplete, duplicate-name protection, Excel/CSV import
+- **RSVP by link** — guests reply themselves via `?w=<code>&p=rsvp` (also the `{rsvp}` placeholder in invitation messages); their answer updates the guest list directly
 - **WhatsApp invitations** — personalised message template with a one-tap send queue
 - **Catering** — eating-pax headcount (babies excluded) per event with a buffer %, per-table vs per-head quote comparison
 - **Budget** — vendors by category and event, budgeted/total/paid tracking, due dates with overdue flags, refundable deposits
 - **Gift money** — record angpow per guest plus off-list gifts, split by side; guest check-in pledges shown for reconciliation
-- **Guest check-in kiosk** — arrival headcount tallied against RSVPs (mismatches flagged red), cash/QR gift flow showing the couple's uploaded QR image
-- **Data tools** — Excel workbook export (Guests, Budget, Other Gifts, Caterers), JSON backup/restore, gift-QR upload
-- **Master control** — hidden admin panel (see the `Admin` link on the wedding-code screen) listing every registered wedding with live stats and full-access entry
-- Light/dark theme, mobile-friendly
+- **Guest check-in kiosk** — arrival headcount tallied against RSVPs (mismatches flagged red), cash/QR gift flow showing the couple's uploaded QR image (`?w=<code>&p=checkin`)
+- **Day-of dashboard** — live arrivals vs expected, awaited list, pledge totals, undo check-in
+- **To-do checklist** — tasks with due dates, assignees, overdue flags, and progress
+- **Data tools** — Excel workbook export (Guests, Budget, Other Gifts, Caterers, To-dos), JSON backup/restore, gift-QR upload
+- **Master control** — hidden admin panel (see the `Admin` link on the wedding-code screen): every registered wedding with live stats, last activity, backup download, archive, delete, and full-access entry
+- **PWA** — installable with app icon ("Add to Home Screen"), light/dark theme, mobile-friendly
 
 ## Architecture
 

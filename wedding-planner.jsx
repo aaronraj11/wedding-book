@@ -72,10 +72,10 @@ const DARK = {
 const C = { ...LIGHT };
 
 const ROLES = {
-  bride: { label: "Bride", icon: "🌸", side: null, tabs: ["overview", "guests", "catering", "budget", "gifts", "data"] },
-  groom: { label: "Groom", icon: "🤵", side: null, tabs: ["overview", "guests", "catering", "budget", "gifts", "data"] },
-  brideAcct: { label: "Bride's Accountant", icon: "📒", side: "bride", tabs: ["overview", "guests", "gifts"] },
-  groomAcct: { label: "Groom's Accountant", icon: "📗", side: "groom", tabs: ["overview", "guests", "gifts"] },
+  bride: { label: "Bride", icon: "🌸", side: null, tabs: ["overview", "guests", "catering", "budget", "todo", "gifts", "dayof", "data"] },
+  groom: { label: "Groom", icon: "🤵", side: null, tabs: ["overview", "guests", "catering", "budget", "todo", "gifts", "dayof", "data"] },
+  brideAcct: { label: "Bride's Accountant", icon: "📒", side: "bride", tabs: ["overview", "guests", "gifts", "dayof"] },
+  groomAcct: { label: "Groom's Accountant", icon: "📗", side: "groom", tabs: ["overview", "guests", "gifts", "dayof"] },
 };
 
 const EMPTY = {
@@ -85,6 +85,7 @@ const EMPTY = {
   caterers: [],
   budget: [],
   extraGifts: [],
+  todos: [],
   bufferPct: 10,
 };
 
@@ -99,7 +100,8 @@ We're getting married! 💍
 
 {couple} warmly invite you ({pax} pax) to celebrate our wedding on {date}.
 
-Kindly reply to this message to let us know if you can make it — we'd love to have you there!
+Kindly let us know if you can make it — just tap the link below to RSVP:
+{rsvp}
 
 With love,
 {couple}`;
@@ -109,11 +111,13 @@ function buildInviteMessage(template, g, settings) {
   const dateStr = settings.date
     ? new Date(settings.date).toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : "(date to be announced)";
+  const rsvpLink = `${location.origin}${location.pathname}?w=${WEDDING}&p=rsvp`;
   return (template || DEFAULT_TEMPLATE)
     .replace(/\{name\}/g, g.name)
     .replace(/\{couple\}/g, settings.couple || "We")
     .replace(/\{date\}/g, dateStr)
-    .replace(/\{pax\}/g, String(num(g.invitedPax) || 1));
+    .replace(/\{pax\}/g, String(num(g.invitedPax) || 1))
+    .replace(/\{rsvp\}/g, rsvpLink);
 }
 
 // normalise a phone number for wa.me — Malaysian numbers starting with 0 get the 60 prefix
@@ -245,7 +249,7 @@ export default function WeddingApp() {
   const [wedding, setWedding] = useState(undefined); // undefined = checking, null = none picked yet
   const [session, setSession] = useState(undefined); // undefined = checking, null = logged out
   const [theme, setTheme] = useState("light");
-  const [guestMode, setGuestMode] = useState(false);
+  const [guestMode, setGuestMode] = useState(null); // null | "checkin" | "rsvp"
   const [adminMode, setAdminMode] = useState(false);
 
   // swap the palette in place before children render
@@ -261,7 +265,8 @@ export default function WeddingApp() {
       // which wedding? URL ?w=code wins, else the last one opened on this device
       let w = null;
       try {
-        const qw = ((new URL(window.location.href).searchParams.get("w") || "").trim().toLowerCase());
+        const params = new URL(window.location.href).searchParams;
+        const qw = (params.get("w") || "").trim().toLowerCase();
         if (qw) {
           w = qw;
           await window.storage.set(WEDDING_KEY, qw);
@@ -269,6 +274,9 @@ export default function WeddingApp() {
           const r = await window.storage.get(WEDDING_KEY);
           w = r && r.value ? r.value : null;
         }
+        // ?p=rsvp or ?p=checkin jumps straight to the guest page
+        const p = (params.get("p") || "").toLowerCase();
+        if (w && (p === "rsvp" || p === "checkin")) setGuestMode(p);
       } catch (e) {
         w = null;
       }
@@ -347,9 +355,20 @@ export default function WeddingApp() {
   if (adminMode)
     return <AdminPanel onExit={() => setAdminMode(false)} onEnter={enterWedding} theme={theme} toggleTheme={toggleTheme} />;
   if (!wedding) return <WeddingGate onOpen={openWedding} theme={theme} toggleTheme={toggleTheme} onAdmin={() => setAdminMode(true)} />;
-  if (guestMode) return <GuestCheckIn onBack={() => setGuestMode(false)} theme={theme} />;
+  if (guestMode === "checkin") return <GuestCheckIn onBack={() => setGuestMode(null)} theme={theme} />;
+  if (guestMode === "rsvp") return <GuestRSVP onBack={() => setGuestMode(null)} theme={theme} />;
   if (!session)
-    return <Login onLogin={login} theme={theme} toggleTheme={toggleTheme} onGuest={() => setGuestMode(true)} onSwitch={switchWedding} wedding={wedding} />;
+    return (
+      <Login
+        onLogin={login}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        onGuest={() => setGuestMode("checkin")}
+        onRsvp={() => setGuestMode("rsvp")}
+        onSwitch={switchWedding}
+        wedding={wedding}
+      />
+    );
   return <Planner role={session.role} onLogout={logout} theme={theme} toggleTheme={toggleTheme} wedding={wedding} />;
 }
 
@@ -392,10 +411,48 @@ function AdminPanel({ onExit, onEnter, theme, toggleTheme }) {
     setDetail((d) => ({ ...d, [code]: { loading: true } }));
     try {
       const r = await window.storage.get(DATA_KEY(code), true);
-      setDetail((d) => ({ ...d, [code]: { data: r && r.value ? JSON.parse(r.value) : null } }));
+      let lastActive = null;
+      try {
+        if (window.storage.getUpdatedAt) lastActive = await window.storage.getUpdatedAt(DATA_KEY(code));
+      } catch (e) {}
+      setDetail((d) => ({ ...d, [code]: { data: r && r.value ? JSON.parse(r.value) : null, lastActive } }));
     } catch (e) {
       setDetail((d) => ({ ...d, [code]: { error: true } }));
     }
+  };
+
+  const saveRegistry = async (next) => {
+    await window.storage.set("registry", JSON.stringify(next), true);
+    setList(next.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+  };
+
+  const setArchived = async (code, archived) => {
+    try {
+      await saveRegistry(list.map((x) => (x.code === code ? { ...x, archived } : x)));
+    } catch (e) {}
+  };
+
+  const [confirmDelete, setConfirmDelete] = useState(null); // code awaiting confirmation
+  const [busyDelete, setBusyDelete] = useState(false);
+
+  const doDelete = async (code) => {
+    setBusyDelete(true);
+    try {
+      await window.storage.delete(DATA_KEY(code), true);
+      await window.storage.delete(ACCT_KEY(code), true);
+      await window.storage.delete(META_KEY(code), true);
+      await saveRegistry(list.filter((x) => x.code !== code));
+      setDetail((d) => ({ ...d, [code]: undefined }));
+      setConfirmDelete(null);
+    } catch (e) {}
+    setBusyDelete(false);
+  };
+
+  const exportWedding = async (code) => {
+    try {
+      const r = await window.storage.get(DATA_KEY(code), true);
+      if (r && r.value) downloadBlob(r.value, `wedding-${code}-backup-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
+    } catch (e) {}
   };
 
   return (
@@ -449,62 +506,100 @@ function AdminPanel({ onExit, onEnter, theme, toggleTheme }) {
                 {list.length} wedding{list.length === 1 ? "" : "s"} registered on your app.
               </span>
             </Card>
-            {list.map((w) => {
-              const d = detail[w.code];
-              const stats = d && d.data ? computeStats(d.data, null) : null;
-              return (
-                <Card key={w.code} style={{ padding: 14 }}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{w.couple || "(unnamed couple)"}</span>
-                    <Pill tone="gold">🔑 {w.code}</Pill>
-                    {w.createdAt && (
-                      <span className="text-xs" style={{ color: C.muted }}>
-                        registered {new Date(w.createdAt).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" })}
-                      </span>
-                    )}
-                    <div className="ml-auto flex gap-2">
-                      {!d && (
-                        <Btn kind="ghost" small onClick={() => loadDetail(w.code)}>
-                          View details
-                        </Btn>
+            {list
+              .slice()
+              .sort((a, b) => (a.archived ? 1 : 0) - (b.archived ? 1 : 0))
+              .map((w) => {
+                const d = detail[w.code];
+                const stats = d && d.data ? computeStats(d.data, null) : null;
+                return (
+                  <Card key={w.code} style={{ padding: 14, opacity: w.archived ? 0.6 : 1 }}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{w.couple || "(unnamed couple)"}</span>
+                      <Pill tone="gold">🔑 {w.code}</Pill>
+                      {w.archived && <Pill>📦 Archived</Pill>}
+                      {w.createdAt && (
+                        <span className="text-xs" style={{ color: C.muted }}>
+                          registered {new Date(w.createdAt).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
                       )}
-                      <Btn small onClick={() => onEnter(w.code)}>
-                        Open with full access
-                      </Btn>
+                      <div className="ml-auto flex gap-2 flex-wrap">
+                        {!d && (
+                          <Btn kind="ghost" small onClick={() => loadDetail(w.code)}>
+                            View details
+                          </Btn>
+                        )}
+                        <Btn kind="ghost" small onClick={() => exportWedding(w.code)}>
+                          ⬇ Backup
+                        </Btn>
+                        <Btn kind="ghost" small onClick={() => setArchived(w.code, !w.archived)}>
+                          {w.archived ? "Unarchive" : "📦 Archive"}
+                        </Btn>
+                        <Btn kind="danger" small onClick={() => setConfirmDelete(w.code)}>
+                          Delete
+                        </Btn>
+                        <Btn small onClick={() => onEnter(w.code)}>
+                          Open with full access
+                        </Btn>
+                      </div>
                     </div>
-                  </div>
-                  {d && d.loading && (
-                    <div className="text-xs mt-2" style={{ color: C.muted }}>
-                      Loading…
-                    </div>
-                  )}
-                  {d && d.error && (
-                    <div className="text-xs mt-2" style={{ color: C.red }}>
-                      Couldn't load this wedding's data.
-                    </div>
-                  )}
-                  {stats && d.data && (
-                    <div className="flex flex-wrap gap-4 mt-3 text-sm">
-                      <span>
-                        📅 <b>{d.data.settings.date || "no date set"}</b>
-                      </span>
-                      <span>
-                        👥 <b>{stats.guestCount}</b> invites · <b>{stats.invitedPax}</b> pax
-                      </span>
-                      <span>
-                        ✅ <b>{stats.confirmedPax}</b> confirmed · {stats.pending} pending
-                      </span>
-                      <span>
-                        💰 budget <b>{RM(stats.actual)}</b> ({RM(stats.paidOut)} paid)
-                      </span>
-                      <span>
-                        💝 gifts <b>{RM(stats.gifts)}</b>
-                      </span>
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
+                    {confirmDelete === w.code && (
+                      <div className="p-3 mt-2" style={{ background: C.redSoft, border: `1px solid ${C.red}`, borderRadius: 10 }}>
+                        <div className="text-sm font-semibold" style={{ color: C.red }}>
+                          Permanently delete "{w.couple || w.code}"?
+                        </div>
+                        <div className="text-xs mt-1" style={{ color: C.muted }}>
+                          This erases the wedding's guests, budget, gifts, and passcodes for everyone. Download a backup
+                          first if in doubt. This cannot be undone.
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Btn small onClick={() => doDelete(w.code)} disabled={busyDelete}>
+                            {busyDelete ? "Deleting…" : "Yes, delete forever"}
+                          </Btn>
+                          <Btn kind="ghost" small onClick={() => setConfirmDelete(null)}>
+                            Cancel
+                          </Btn>
+                        </div>
+                      </div>
+                    )}
+                    {d && d.loading && (
+                      <div className="text-xs mt-2" style={{ color: C.muted }}>
+                        Loading…
+                      </div>
+                    )}
+                    {d && d.error && (
+                      <div className="text-xs mt-2" style={{ color: C.red }}>
+                        Couldn't load this wedding's data.
+                      </div>
+                    )}
+                    {stats && d.data && (
+                      <div className="flex flex-wrap gap-4 mt-3 text-sm">
+                        <span>
+                          📅 <b>{d.data.settings.date || "no date set"}</b>
+                        </span>
+                        <span>
+                          👥 <b>{stats.guestCount}</b> invites · <b>{stats.invitedPax}</b> pax
+                        </span>
+                        <span>
+                          ✅ <b>{stats.confirmedPax}</b> confirmed · {stats.pending} pending
+                        </span>
+                        <span>
+                          💰 budget <b>{RM(stats.actual)}</b> ({RM(stats.paidOut)} paid)
+                        </span>
+                        <span>
+                          💝 gifts <b>{RM(stats.gifts)}</b>
+                        </span>
+                        {d.lastActive && (
+                          <span>
+                            🕐 last activity{" "}
+                            <b>{new Date(d.lastActive).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</b>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
           </div>
         )}
       </div>
@@ -662,7 +757,7 @@ function WeddingGate({ onOpen, theme, toggleTheme, onAdmin }) {
 }
 
 // ---------- login screen ----------
-function Login({ onLogin, theme, toggleTheme, onGuest, onSwitch, wedding }) {
+function Login({ onLogin, theme, toggleTheme, onGuest, onRsvp, onSwitch, wedding }) {
   const [accounts, setAccounts] = useState(null); // {role: scrambledCode}
   const [picked, setPicked] = useState(null);
   const [code, setCode] = useState("");
@@ -798,9 +893,12 @@ function Login({ onLogin, theme, toggleTheme, onGuest, onSwitch, wedding }) {
 
         <div className="text-center mt-5 p-4" style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 12 }}>
           <div className="text-xs uppercase tracking-widest mb-2" style={{ color: C.muted }}>
-            Arriving at the wedding?
+            Invited to the wedding?
           </div>
-          <Btn kind="gold" onClick={onGuest}>🎟️ Guest check-in</Btn>
+          <div className="flex gap-2 justify-center flex-wrap">
+            <Btn kind="gold" onClick={onRsvp}>💌 RSVP</Btn>
+            <Btn kind="gold" onClick={onGuest}>🎟️ Guest check-in</Btn>
+          </div>
         </div>
 
         <p className="text-xs text-center mt-4" style={{ color: C.muted }}>
@@ -1049,6 +1147,214 @@ function GuestCheckIn({ onBack, theme }) {
   );
 }
 
+// ---------- guest rsvp by link ----------
+function GuestRSVP({ onBack, theme }) {
+  const [data, setData] = useState(null);
+  const [search, setSearch] = useState("");
+  const [sel, setSel] = useState(null);
+  const [coming, setComing] = useState(null); // null | "yes" | "no"
+  const [pax, setPax] = useState("");
+  const [babies, setBabies] = useState("");
+  const [dietary, setDietary] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await window.storage.get(DATA_KEY(), true);
+        setData(r && r.value ? JSON.parse(r.value) : { ...EMPTY });
+      } catch (e) {
+        setData({ ...EMPTY });
+      }
+    })();
+  }, []);
+
+  const settings = (data && data.settings) || {};
+  const guests = (data && data.guests) || [];
+  const q = search.trim().toLowerCase();
+  const matches = q.length >= 2 ? guests.filter((g) => g.name.toLowerCase().includes(q)).slice(0, 8) : [];
+
+  const dateStr = settings.date
+    ? new Date(settings.date).toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : "(date to be announced)";
+
+  const pick = (g) => {
+    setSel(g);
+    setComing(g.rsvp === "yes" ? "yes" : g.rsvp === "no" ? "no" : null);
+    setPax(String(num(g.confirmedPax || g.invitedPax) || 1));
+    setBabies(String(g.confirmedBabies === "" || g.confirmedBabies === undefined ? num(g.invitedBabies) : num(g.confirmedBabies)));
+    setDietary(g.dietary || "");
+    setErr("");
+  };
+
+  const choiceBtn = (active, tone) => ({
+    padding: "10px 26px",
+    borderRadius: 999,
+    fontWeight: 600,
+    fontSize: 15,
+    cursor: "pointer",
+    border: `1px solid ${active ? tone : C.line}`,
+    background: active ? (tone === C.green ? C.greenSoft : C.redSoft) : C.card,
+    color: active ? tone : C.muted,
+  });
+
+  const submit = async () => {
+    if (!sel || !coming) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const r = await window.storage.get(DATA_KEY(), true);
+      const fresh = r && r.value ? JSON.parse(r.value) : { ...EMPTY };
+      fresh.guests = (fresh.guests || []).map((g) =>
+        g.id === sel.id
+          ? coming === "yes"
+            ? { ...g, rsvp: "yes", confirmedPax: num(pax) || 1, confirmedBabies: String(num(babies)), dietary: dietary.trim(), rsvpAt: Date.now() }
+            : { ...g, rsvp: "no", confirmedPax: "", confirmedBabies: "", rsvpAt: Date.now() }
+          : g
+      );
+      await window.storage.set(DATA_KEY(), JSON.stringify(fresh), true);
+      setDone(true);
+    } catch (e) {
+      setErr("Couldn't save your reply — please try again, or message the couple directly.");
+    }
+    setBusy(false);
+  };
+
+  const reset = () => {
+    setDone(false);
+    setSel(null);
+    setSearch("");
+    setComing(null);
+    setPax("");
+    setBabies("");
+    setDietary("");
+    setErr("");
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ background: C.ivory, color: C.ink, colorScheme: theme }}>
+      <GlobalStyle />
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
+          <div className="text-xs uppercase tracking-widest mb-1" style={{ color: C.gold }}>
+            ❦ &nbsp;{settings.couple || "Our Wedding"}&nbsp; ❦
+          </div>
+          <div style={{ ...serif, fontSize: 30, fontWeight: 600 }}>Will you join us?</div>
+          <p className="text-sm mt-1" style={{ color: C.muted }}>{dateStr}</p>
+        </div>
+
+        {!data ? (
+          <Card>
+            <span style={{ color: C.muted }}>Loading…</span>
+          </Card>
+        ) : done ? (
+          <Card>
+            <div style={{ ...serif, fontSize: 22, fontWeight: 600 }}>
+              {coming === "yes" ? "Wonderful — see you there! 🥂" : "We'll miss you 💛"}
+            </div>
+            <p className="text-sm mt-2" style={{ color: C.muted }}>
+              {sel.name} · {coming === "yes" ? `${num(pax)} pax confirmed` : "declined with our thanks for letting us know"}
+            </p>
+            <div className="mt-4">
+              <Btn onClick={reset}>✓ Done</Btn>
+            </div>
+          </Card>
+        ) : !sel ? (
+          <Card>
+            <Field label="Find your invitation — type your name">
+              <input style={inputStyle} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="e.g. Uncle Lim" autoFocus />
+            </Field>
+            <div className="grid gap-2 mt-3">
+              {matches.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => pick(g)}
+                  className="text-left p-3"
+                  style={{ background: C.soft, border: `1px solid ${C.line}`, borderRadius: 10, cursor: "pointer", color: C.ink }}
+                >
+                  <span className="font-semibold">{g.name}</span>
+                  <span className="text-xs" style={{ color: C.muted }}>
+                    {" "}· invited with {g.invitedPax} pax{g.group ? ` · ${g.group}` : ""}
+                  </span>
+                  {g.rsvp !== "pending" && (
+                    <span className="text-xs" style={{ color: g.rsvp === "yes" ? C.green : C.red }}>
+                      {" "}· replied: {g.rsvp === "yes" ? "attending" : "declined"} (you can change it)
+                    </span>
+                  )}
+                </button>
+              ))}
+              {q.length >= 2 && matches.length === 0 && (
+                <span className="text-sm" style={{ color: C.muted }}>
+                  No invitation found under that name — please check with the couple.
+                </span>
+              )}
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <div className="flex items-center justify-between">
+              <div style={{ ...serif, fontSize: 20, fontWeight: 600 }}>{sel.name}</div>
+              <Btn kind="ghost" small onClick={() => setSel(null)}>
+                Not you?
+              </Btn>
+            </div>
+            <p className="text-xs mt-1" style={{ color: C.muted }}>
+              You're invited with {sel.invitedPax} pax
+            </p>
+
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setComing("yes")} style={choiceBtn(coming === "yes", C.green)}>
+                🎉 Joyfully attending
+              </button>
+              <button onClick={() => setComing("no")} style={choiceBtn(coming === "no", C.red)}>
+                Regretfully can't
+              </button>
+            </div>
+
+            {coming === "yes" && (
+              <div className="mt-4 grid gap-3">
+                <div className="flex gap-3 flex-wrap items-end">
+                  <Field label="How many of you are coming?">
+                    <input style={{ ...inputStyle, width: 120 }} type="number" min="1" max={num(sel.invitedPax) || undefined} value={pax} onChange={(e) => setPax(e.target.value)} />
+                  </Field>
+                  <Field label="…of which babies 👶">
+                    <input style={{ ...inputStyle, width: 110 }} type="number" min="0" value={babies} onChange={(e) => setBabies(e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Dietary needs / notes (optional)">
+                  <input style={inputStyle} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Vegetarian, halal, no beef, baby chair…" />
+                </Field>
+              </div>
+            )}
+
+            {err && (
+              <div className="text-xs mt-3" style={{ color: C.red }}>
+                {err}
+              </div>
+            )}
+            <div className="mt-5">
+              <Btn onClick={submit} disabled={busy || !coming || (coming === "yes" && !num(pax))}>
+                {busy ? "Sending…" : "Send reply 💌"}
+              </Btn>
+            </div>
+          </Card>
+        )}
+
+        <p className="text-xs text-center mt-4">
+          <button
+            onClick={onBack}
+            style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", textDecoration: "underline" }}
+          >
+            Planner sign-in
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ---------- main planner ----------
 function Planner({ role, onLogout, theme, toggleTheme, wedding }) {
   const roleInfo = ROLES[role];
@@ -1061,6 +1367,13 @@ function Planner({ role, onLogout, theme, toggleTheme, wedding }) {
   const [saveState, setSaveState] = useState("saved");
   const [showCodes, setShowCodes] = useState(false);
   const first = useRef(true);
+  const lastRemote = useRef(""); // last state received from (or confirmed in) the shared database
+
+  const normalize = (parsed) => {
+    const next = { ...EMPTY, ...parsed, settings: { ...EMPTY.settings, ...(parsed.settings || {}) } };
+    if (!next.events || next.events.length === 0) next.events = defaultEvents(next.settings);
+    return next;
+  };
 
   // load shared data
   useEffect(() => {
@@ -1068,18 +1381,31 @@ function Planner({ role, onLogout, theme, toggleTheme, wedding }) {
       let next = { ...EMPTY };
       try {
         const r = await window.storage.get(DATA_KEY(), true);
-        if (r && r.value) {
-          const parsed = JSON.parse(r.value);
-          next = { ...EMPTY, ...parsed, settings: { ...EMPTY.settings, ...(parsed.settings || {}) } };
-        }
+        if (r && r.value) next = normalize(JSON.parse(r.value));
+        else next = normalize(next);
       } catch (e) {
-        /* nothing saved yet */
+        next = normalize(next);
       }
-      if (!next.events || next.events.length === 0) next.events = defaultEvents(next.settings);
+      lastRemote.current = JSON.stringify(next);
       setData(next);
       setLoaded(true);
     })();
   }, []);
+
+  // live sync: apply changes other people make, as they make them
+  useEffect(() => {
+    if (!loaded || !window.storage.subscribe) return;
+    const unsub = window.storage.subscribe(DATA_KEY(), (r) => {
+      if (!r || typeof r.value !== "string") return;
+      if (r.client && r.client === window.storage.clientId) return; // our own write echoing back
+      try {
+        const next = normalize(JSON.parse(r.value));
+        lastRemote.current = JSON.stringify(next);
+        setData(next);
+      } catch (e) {}
+    });
+    return unsub;
+  }, [loaded]);
 
   // save shared data (debounced)
   useEffect(() => {
@@ -1088,6 +1414,7 @@ function Planner({ role, onLogout, theme, toggleTheme, wedding }) {
       first.current = false;
       return;
     }
+    if (JSON.stringify(data) === lastRemote.current) return; // change came from the database, not this user
     setSaveState("saving");
     const t = setTimeout(async () => {
       try {
@@ -1114,7 +1441,9 @@ function Planner({ role, onLogout, theme, toggleTheme, wedding }) {
     guests: side ? `${cap(side)}'s Guests & RSVP` : "Guests & RSVP",
     catering: "Catering",
     budget: "Budget",
+    todo: "✅ To-dos",
     gifts: side ? `${cap(side)}'s Gift Money` : "Gift Money",
+    dayof: "🎟️ Day-of",
     data: "💾 Data",
   };
   const tabs = roleInfo.tabs;
@@ -1233,7 +1562,9 @@ function Planner({ role, onLogout, theme, toggleTheme, wedding }) {
           {tab === "guests" && <Guests data={data} up={up} side={side} />}
           {tab === "catering" && isCouple && <Catering data={data} up={up} stats={stats} />}
           {tab === "budget" && isCouple && <Budget data={data} up={up} stats={stats} />}
+          {tab === "todo" && isCouple && <Todos data={data} up={up} />}
           {tab === "gifts" && <Gifts data={data} up={up} side={side} />}
+          {tab === "dayof" && <DayOf data={data} up={up} side={side} />}
           {tab === "data" && isCouple && <DataPanel data={data} up={up} />}
         </div>
       </div>
@@ -1975,6 +2306,14 @@ function DataPanel({ data, up }) {
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(extraRows), "Other Gifts");
 
+    const todoRows = (data.todos || []).map((t) => ({
+      Task: t.title,
+      Done: t.done ? "Yes" : "No",
+      "Due Date": t.due ? new Date(t.due).toLocaleDateString("en-MY") : "",
+      "Handled By": t.assignee || "",
+    }));
+    if (todoRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(todoRows), "To-dos");
+
     const catererRows = data.caterers.map((c) => ({
       Caterer: c.name,
       Pricing: c.mode === "table" ? "Per table" : "Per head",
@@ -2282,8 +2621,9 @@ function InvitePanel({ data, up, pool }) {
             </Field>
             <div className="text-xs mt-2" style={{ color: C.muted }}>
               Placeholders: <b>{"{name}"}</b> guest's name · <b>{"{couple}"}</b> your names · <b>{"{date}"}</b> wedding
-              date · <b>{"{pax}"}</b> their invited pax. The template is shared, so set it once and both accountants
-              use the same wording.
+              date · <b>{"{pax}"}</b> their invited pax · <b>{"{rsvp}"}</b> a link where the guest replies directly in
+              the app (their answer updates your list automatically). The template is shared, so set it once and both
+              accountants use the same wording.
             </div>
             <div className="mt-2">
               <Btn kind="ghost" small onClick={() => setTemplate(DEFAULT_TEMPLATE)}>
@@ -2964,6 +3304,210 @@ function Budget({ data, up, stats }) {
           </Card>
         );
       })}
+    </div>
+  );
+}
+
+// ---------- to-do / timeline checklist (couple only) ----------
+function Todos({ data, up }) {
+  const todos = data.todos || [];
+  const [form, setForm] = useState({ title: "", due: "", assignee: "" });
+  const [filter, setFilter] = useState("open");
+
+  const add = () => {
+    if (!form.title.trim()) return;
+    up({ todos: [...todos, { id: uid(), title: form.title.trim(), due: form.due, assignee: form.assignee.trim(), done: false, createdAt: Date.now() }] });
+    setForm({ title: "", due: "", assignee: form.assignee });
+  };
+  const patch = (id, p) => up({ todos: todos.map((t) => (t.id === id ? { ...t, ...p } : t)) });
+  const remove = (id) => up({ todos: todos.filter((t) => t.id !== id) });
+
+  const today = new Date(new Date().toDateString());
+  const isOverdue = (t) => !t.done && t.due && new Date(t.due) < today;
+  const doneCount = todos.filter((t) => t.done).length;
+
+  const shown = todos
+    .filter((t) => (filter === "open" ? !t.done : filter === "done" ? t.done : true))
+    .slice()
+    .sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      if (!a.due && !b.due) return (a.createdAt || 0) - (b.createdAt || 0);
+      if (!a.due) return 1;
+      if (!b.due) return -1;
+      return a.due.localeCompare(b.due);
+    });
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <Stat label="Tasks" value={todos.length} />
+        <Stat label="Done" value={doneCount} tone={C.green} sub={todos.length ? `${Math.round((doneCount / todos.length) * 100)}% complete` : undefined} />
+        <Stat label="Overdue" value={todos.filter(isOverdue).length} tone={todos.some(isOverdue) ? C.red : C.green} />
+      </div>
+
+      <Card>
+        <div style={{ ...serif, fontSize: 20, fontWeight: 600 }} className="mb-3">
+          Add a task
+        </div>
+        <div className="grid md:grid-cols-5 gap-3 items-end">
+          <Field label="Task" className="md:col-span-2">
+            <input style={inputStyle} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Book the photographer" onKeyDown={(e) => e.key === "Enter" && add()} />
+          </Field>
+          <Field label="Due date">
+            <input style={inputStyle} type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} />
+          </Field>
+          <Field label="Handled by">
+            <input style={inputStyle} value={form.assignee} onChange={(e) => setForm({ ...form, assignee: e.target.value })} placeholder="e.g. Aaron" />
+          </Field>
+          <div>
+            <Btn onClick={add}>Add task</Btn>
+          </div>
+        </div>
+      </Card>
+
+      <div className="flex gap-2 flex-wrap">
+        {[["open", "Open"], ["done", "Done"], ["all", "All"]].map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setFilter(k)}
+            style={{
+              padding: "5px 12px",
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              border: `1px solid ${filter === k ? C.gold : C.line}`,
+              background: filter === k ? C.goldSoft : C.card,
+              color: filter === k ? C.gold : C.muted,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {shown.length === 0 ? (
+        <Card>
+          <span style={{ color: C.muted }}>
+            {todos.length === 0 ? "No tasks yet. Common first ones: book venue, confirm caterer, order invitations." : "Nothing here with this filter."}
+          </span>
+        </Card>
+      ) : (
+        <Card style={{ padding: 14 }}>
+          <div className="grid gap-2">
+            {shown.map((t) => {
+              const overdue = isOverdue(t);
+              return (
+                <div key={t.id} className="flex flex-wrap items-center gap-2 p-2" style={{ background: t.done ? C.greenSoft : C.soft, border: `1px solid ${overdue ? C.red : C.line}`, borderRadius: 8 }}>
+                  <input type="checkbox" checked={!!t.done} onChange={(e) => patch(t.id, { done: e.target.checked })} style={{ width: 18, height: 18, accentColor: C.green, cursor: "pointer" }} />
+                  <span className="text-sm font-medium" style={{ textDecoration: t.done ? "line-through" : "none", color: t.done ? C.muted : C.ink }}>
+                    {t.title}
+                  </span>
+                  {t.assignee && <Pill>📋 {t.assignee}</Pill>}
+                  {t.due && (
+                    <Pill tone={t.done ? "neutral" : overdue ? "red" : "gold"}>
+                      {overdue ? "⚠️ " : "📅 "}
+                      {new Date(t.due).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" })}
+                    </Pill>
+                  )}
+                  <div className="ml-auto flex items-center gap-2">
+                    <input style={{ ...inputStyle, width: 130, padding: "3px 8px", fontSize: 12 }} type="date" value={t.due || ""} onChange={(e) => patch(t.id, { due: e.target.value })} />
+                    <Btn kind="danger" small onClick={() => remove(t.id)}>
+                      ✕
+                    </Btn>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ---------- day-of: live arrivals dashboard ----------
+function DayOf({ data, up, side }) {
+  const pool = side ? data.guests.filter((g) => g.side === side) : data.guests;
+  const patch = (id, p) => up({ guests: data.guests.map((g) => (g.id === id ? { ...g, ...p } : g)) });
+
+  const arrived = pool.filter((g) => g.checkedInAt).slice().sort((a, b) => (b.checkedInAt || 0) - (a.checkedInAt || 0));
+  const awaited = pool.filter((g) => g.rsvp === "yes" && !g.checkedInAt);
+  const arrivedPax = arrived.reduce((s, g) => s + num(g.checkedInPax), 0);
+  const expectedPax = pool.filter((g) => g.rsvp === "yes").reduce((s, g) => s + num(g.confirmedPax || g.invitedPax || 1), 0);
+  const pledgeCash = pool.reduce((s, g) => s + (g.pledgeMethod !== "qr" ? num(g.pledgeAmount) : 0), 0);
+  const pledgeQr = pool.reduce((s, g) => s + (g.pledgeMethod === "qr" ? num(g.pledgeAmount) : 0), 0);
+
+  const timeOf = (ts) => new Date(ts).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat label="Arrived" value={`${arrivedPax} pax`} sub={`${arrived.length} invites checked in`} tone={C.green} />
+        <Stat
+          label="Expected"
+          value={`${expectedPax} pax`}
+          sub={expectedPax > 0 ? `${Math.min(100, Math.round((arrivedPax / expectedPax) * 100))}% arrived` : "no confirmed RSVPs"}
+        />
+        <Stat label="Still awaited" value={awaited.length} sub="confirmed but not here yet" tone={awaited.length > 0 ? C.gold : C.green} />
+        <Stat label="Gift pledges" value={RM(pledgeCash + pledgeQr)} sub={`${RM(pledgeCash)} cash · ${RM(pledgeQr)} QR`} tone={C.gold} />
+      </div>
+
+      <Card>
+        <div style={{ ...serif, fontSize: 20, fontWeight: 600 }}>🎟️ Arrivals {side && <Pill tone={side === "bride" ? "gold" : "green"}>{cap(side)}'s side</Pill>}</div>
+        <p className="text-xs mt-1 mb-3" style={{ color: C.muted }}>
+          Updates live as guests check in at the door. Red pax counts don't match the RSVP — worth a quick look.
+        </p>
+        {arrived.length === 0 ? (
+          <span className="text-sm" style={{ color: C.muted }}>
+            No one has checked in yet. Guests check in from the app's front screen — or set up a tablet at the entrance.
+          </span>
+        ) : (
+          <div className="grid gap-2">
+            {arrived.map((g) => {
+              const expected = num(g.confirmedPax || g.invitedPax || 1);
+              const match = num(g.checkedInPax) === expected;
+              return (
+                <div key={g.id} className="flex flex-wrap items-center gap-2 p-2" style={{ background: C.soft, border: `1px solid ${C.line}`, borderRadius: 8 }}>
+                  <span className="text-xs" style={{ color: C.muted }}>
+                    {timeOf(g.checkedInAt)}
+                  </span>
+                  <span className="text-sm font-medium">{g.name}</span>
+                  {!side && <Pill tone={g.side === "bride" ? "gold" : "green"}>{cap(g.side)}</Pill>}
+                  <Pill tone={match ? "green" : "red"}>
+                    {num(g.checkedInPax)} pax{!match ? ` (expected ${expected})` : ""}
+                  </Pill>
+                  {num(g.pledgeAmount) > 0 && (
+                    <Pill tone="gold">💝 {RM(g.pledgeAmount)} · {g.pledgeMethod === "qr" ? "QR" : "cash"}</Pill>
+                  )}
+                  <div className="ml-auto">
+                    <Btn kind="danger" small onClick={() => patch(g.id, { checkedInAt: null, checkedInPax: null })}>
+                      Undo check-in
+                    </Btn>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <div style={{ ...serif, fontSize: 18, fontWeight: 600 }} className="mb-2">
+          Confirmed but not arrived ({awaited.length})
+        </div>
+        {awaited.length === 0 ? (
+          <span className="text-sm" style={{ color: C.muted }}>Everyone who confirmed is here 🎉</span>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {awaited.map((g) => (
+              <Pill key={g.id}>
+                {g.name} · {num(g.confirmedPax || g.invitedPax || 1)} pax
+              </Pill>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
