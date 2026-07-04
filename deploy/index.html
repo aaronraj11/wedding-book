@@ -198,6 +198,9 @@ const EMPTY = {
 // a guest with no event tags is invited to everything (the default)
 const guestInEvent = (g, evId) => !evId || !g.events || g.events.length === 0 || g.events.includes(evId);
 
+// "Nathan Mama, Vicky Mami; Prabhu" -> ["Nathan Mama", "Vicky Mami", "Prabhu"]
+const parseMembers = (s) => (s || "").split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
+
 const defaultEvents = (settings) => [{ id: "ev-" + uid(), name: "Wedding Day", icon: "💒", date: (settings && settings.date) || "" }];
 
 const DEFAULT_TEMPLATE = `Dear {name} 💕
@@ -251,6 +254,24 @@ function Field({ label, children, className = "" }) {
       </span>
       {children}
     </label>
+  );
+}
+
+// free-typing input for a member list — parses to an array only on blur so commas don't fight the cursor
+function MembersInput({ value, onChange, width }) {
+  const joined = (value || []).join(", ");
+  const [text, setText] = useState(joined);
+  useEffect(() => {
+    setText(joined);
+  }, [joined]);
+  return (
+    <input
+      style={{ ...inputStyle, width: width || 260 }}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => onChange(parseMembers(text))}
+      placeholder="e.g. Nathan Mama, Vicky Mami, Prabhu"
+    />
   );
 }
 
@@ -1178,6 +1199,11 @@ function GuestCheckIn({ onBack, theme, locked }) {
             <p className="text-xs mt-1" style={{ color: C.muted }}>
               Invited: {sel.invitedPax} pax{sel.checkedInAt ? " · you've checked in before — this will update it" : ""}
             </p>
+            {(sel.members || []).length > 0 && (
+              <p className="text-xs mt-1" style={{ color: C.muted }}>
+                Party: {(sel.rsvp === "yes" && Array.isArray(sel.confirmedMembers) && sel.confirmedMembers.length ? sel.confirmedMembers : sel.members).join(", ")}
+              </p>
+            )}
 
             <div className="mt-4">
               <div className="flex gap-3 flex-wrap items-end">
@@ -1260,6 +1286,7 @@ function GuestRSVP({ onBack, theme, locked }) {
   const [pax, setPax] = useState("");
   const [babies, setBabies] = useState("");
   const [dietary, setDietary] = useState("");
+  const [selMembers, setSelMembers] = useState([]);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState("");
@@ -1290,6 +1317,11 @@ function GuestRSVP({ onBack, theme, locked }) {
     setPax(String(num(g.confirmedPax || g.invitedPax) || 1));
     setBabies(String(g.confirmedBabies === "" || g.confirmedBabies === undefined ? num(g.invitedBabies) : num(g.confirmedBabies)));
     setDietary(g.dietary || "");
+    setSelMembers(
+      Array.isArray(g.confirmedMembers)
+        ? g.confirmedMembers.filter((m) => (g.members || []).includes(m))
+        : [...(g.members || [])]
+    );
     setErr("");
   };
 
@@ -1314,7 +1346,15 @@ function GuestRSVP({ onBack, theme, locked }) {
       fresh.guests = (fresh.guests || []).map((g) =>
         g.id === sel.id
           ? coming === "yes"
-            ? { ...g, rsvp: "yes", confirmedPax: num(pax) || 1, confirmedBabies: String(num(babies)), dietary: dietary.trim(), rsvpAt: Date.now() }
+            ? {
+                ...g,
+                rsvp: "yes",
+                confirmedPax: num(pax) || 1,
+                confirmedBabies: String(num(babies)),
+                dietary: dietary.trim(),
+                rsvpAt: Date.now(),
+                ...((sel.members || []).length > 0 ? { confirmedMembers: selMembers } : {}),
+              }
             : { ...g, rsvp: "no", confirmedPax: "", confirmedBabies: "", rsvpAt: Date.now() }
           : g
       );
@@ -1419,6 +1459,40 @@ function GuestRSVP({ onBack, theme, locked }) {
 
             {coming === "yes" && (
               <div className="mt-4 grid gap-3">
+                {(sel.members || []).length > 0 && (
+                  <div>
+                    <div className="text-sm font-semibold mb-2">Who's coming? Tap names to toggle</div>
+                    <div className="flex flex-wrap gap-2">
+                      {sel.members.map((m) => {
+                        const on = selMembers.includes(m);
+                        return (
+                          <button
+                            key={m}
+                            onClick={() => {
+                              const next = on ? selMembers.filter((x) => x !== m) : [...selMembers, m];
+                              setSelMembers(next);
+                              setPax(String(next.length || 1));
+                            }}
+                            style={{
+                              padding: "6px 14px",
+                              borderRadius: 999,
+                              fontSize: 13,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              border: `1px solid ${on ? C.green : C.line}`,
+                              background: on ? C.greenSoft : C.card,
+                              color: on ? C.green : C.muted,
+                              textDecoration: on ? "none" : "line-through",
+                            }}
+                          >
+                            {on ? "✓ " : ""}
+                            {m}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-3 flex-wrap items-end">
                   <Field label="How many of you are coming? (everyone, incl. babies)">
                     <input style={{ ...inputStyle, width: 130 }} type="number" min="1" max={num(sel.invitedPax) || undefined} value={pax} onChange={(e) => setPax(e.target.value)} />
@@ -1972,7 +2046,7 @@ function Overview({ stats, data, setTab, side }) {
 
 // ---------- guests & rsvp ----------
 function Guests({ data, up, side }) {
-  const [form, setForm] = useState({ name: "", side: side || "bride", group: "", invitedPax: 2, invitedBabies: 0, phone: "" });
+  const [form, setForm] = useState({ name: "", side: side || "bride", group: "", invitedPax: 2, invitedBabies: 0, phone: "", members: "" });
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [view, setView] = useState("list");
@@ -1992,7 +2066,8 @@ function Guests({ data, up, side }) {
 
   const add = () => {
     if (!form.name.trim() || dupName) return;
-    const pax = num(form.invitedPax) || 1;
+    const members = parseMembers(form.members);
+    const pax = Math.max(num(form.invitedPax) || 1, members.length);
     const g = {
       id: uid(),
       name: form.name.trim(),
@@ -2001,6 +2076,7 @@ function Guests({ data, up, side }) {
       invitedPax: pax,
       invitedBabies: Math.min(num(form.invitedBabies), pax),
       phone: form.phone.trim(),
+      members: members.length ? members : undefined,
       rsvp: "pending",
       confirmedPax: "",
       confirmedBabies: "",
@@ -2010,7 +2086,14 @@ function Guests({ data, up, side }) {
       giftNote: "",
     };
     up({ guests: [g, ...data.guests] });
-    setForm({ name: "", side: side || form.side, group: form.group, invitedPax: 2, invitedBabies: 0, phone: "" });
+    setForm({ name: "", side: side || form.side, group: form.group, invitedPax: 2, invitedBabies: 0, phone: "", members: "" });
+  };
+
+  // planners tick off who from a family is coming; confirmed pax follows the count
+  const toggleMember = (g, m) => {
+    const base = Array.isArray(g.confirmedMembers) ? g.confirmedMembers : [...(g.members || [])];
+    const next = base.includes(m) ? base.filter((x) => x !== m) : [...base, m];
+    patch(g.id, { confirmedMembers: next, confirmedPax: next.length });
   };
 
   const patch = (id, p) => up({ guests: data.guests.map((g) => (g.id === id ? { ...g, ...p } : g)) });
@@ -2087,6 +2170,14 @@ function Guests({ data, up, side }) {
           Babies are counted in the invite (e.g. 4 pax, 1 baby) but excluded from the catering headcount — they don't take a seat's worth of food.
         </p>
         <div className="grid md:grid-cols-5 gap-3 items-end mt-3">
+          <Field label="Family members (optional, comma-separated)" className="md:col-span-2">
+            <input
+              style={inputStyle}
+              value={form.members}
+              onChange={(e) => setForm({ ...form, members: e.target.value })}
+              placeholder="e.g. Nathan Mama, Vicky Mami, Prabhu, Arvind, Pravin"
+            />
+          </Field>
           <Field label="Phone (optional)" className="md:col-span-2">
             <input style={inputStyle} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="e.g. 012-345 6789" />
           </Field>
@@ -2094,6 +2185,10 @@ function Guests({ data, up, side }) {
             <Btn onClick={add}>Add guest</Btn>
           </div>
         </div>
+        <p className="text-xs mt-2" style={{ color: C.muted }}>
+          Name the people under this invite and the pax count follows automatically. Once they RSVP, you (or they, via
+          the RSVP link) can tick exactly who's coming.
+        </p>
       </Card>
 
       <InvitePanel data={data} up={up} pool={pool} />
@@ -2231,6 +2326,43 @@ function Guests({ data, up, side }) {
               </Btn>
             </div>
           </div>
+          {(g.members || []).length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mt-2">
+              <span className="text-xs mr-1" style={{ color: C.muted }}>
+                👨‍👩‍👧
+              </span>
+              {g.members.map((m) => {
+                const known = g.rsvp === "yes" && Array.isArray(g.confirmedMembers);
+                const coming = known ? g.confirmedMembers.includes(m) : null;
+                return (
+                  <button
+                    key={m}
+                    onClick={() => g.rsvp === "yes" && toggleMember(g, m)}
+                    title={g.rsvp === "yes" ? "Tap to toggle whether this person is coming" : "Set RSVP to Attending to tick people off"}
+                    style={{
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: g.rsvp === "yes" ? "pointer" : "default",
+                      border: `1px solid ${coming === true ? C.green : C.line}`,
+                      background: coming === true ? C.greenSoft : "transparent",
+                      color: coming === true ? C.green : C.muted,
+                      textDecoration: coming === false ? "line-through" : "none",
+                    }}
+                  >
+                    {coming === true ? "✓ " : ""}
+                    {m}
+                  </button>
+                );
+              })}
+              {g.rsvp === "yes" && (
+                <span className="text-xs ml-1" style={{ color: C.muted }}>
+                  tap names to mark who's coming
+                </span>
+              )}
+            </div>
+          )}
           {editId === g.id && (
             <div className="flex flex-wrap gap-3 mt-3 items-end p-3" style={{ background: C.soft, border: `1px dashed ${C.gold}`, borderRadius: 8 }}>
               <Field label="Name">
@@ -2246,6 +2378,17 @@ function Guests({ data, up, side }) {
               )}
               <Field label="Group / relation">
                 <input style={{ ...inputStyle, width: 230 }} list="group-suggestions" value={g.group || ""} onChange={(e) => patch(g.id, { group: e.target.value })} placeholder="e.g. Dad's family / Uncle Ravi's family" />
+              </Field>
+              <Field label="Members (comma-separated)">
+                <MembersInput
+                  value={g.members}
+                  onChange={(m) =>
+                    patch(g.id, {
+                      members: m.length ? m : undefined,
+                      invitedPax: Math.max(num(g.invitedPax) || 1, m.length),
+                    })
+                  }
+                />
               </Field>
               <Field label="Invited pax">
                 <input style={{ ...inputStyle, width: 90 }} type="number" min="1" value={g.invitedPax} onChange={(e) => patch(g.id, { invitedPax: e.target.value })} />
@@ -2370,11 +2513,13 @@ function DataPanel({ data, up }) {
       Group: g.group || "",
       "Invited Pax": num(g.invitedPax),
       Babies: num(g.invitedBabies),
+      Members: (g.members || []).join(", "),
       Phone: g.phone || "",
       "Invited To": !g.events || g.events.length === 0 ? "All events" : (data.events || []).filter((e) => g.events.includes(e.id)).map((e) => e.name).join(", "),
       RSVP: g.rsvp === "yes" ? "Attending" : g.rsvp === "no" ? "Declined" : "Pending",
       "Confirmed Pax": g.rsvp === "yes" ? num(g.confirmedPax || g.invitedPax) : "",
       "Confirmed Babies": g.rsvp === "yes" ? (g.confirmedBabies === "" || g.confirmedBabies === undefined ? num(g.invitedBabies) : num(g.confirmedBabies)) : "",
+      "Confirmed Members": g.rsvp === "yes" && Array.isArray(g.confirmedMembers) ? g.confirmedMembers.join(", ") : "",
       Dietary: g.dietary || "",
       "Invite Sent": g.invitedAt ? new Date(g.invitedAt).toLocaleDateString("en-MY") : "",
       "Checked In Pax": g.checkedInAt ? num(g.checkedInPax) : "",
@@ -2457,6 +2602,7 @@ function DataPanel({ data, up }) {
       const kPax = find("pax", "persons", "people", "qty");
       const kBaby = find("bab", "infant");
       const kPhone = find("phone", "contact", "whatsapp", "mobile", "tel");
+      const kMembers = find("member", "subfamily", "names");
 
       const existing = new Set(data.guests.map((g) => g.name.trim().toLowerCase()));
       let added = 0,
@@ -2470,7 +2616,8 @@ function DataPanel({ data, up }) {
           return;
         }
         const sideRaw = kSide ? String(r[kSide]).toLowerCase() : "";
-        const pax = kPax ? num(r[kPax]) || 1 : 1;
+        const members = kMembers ? parseMembers(String(r[kMembers])) : [];
+        const pax = Math.max(kPax ? num(r[kPax]) || 1 : 1, members.length);
         newGuests.push({
           id: uid(),
           name,
@@ -2478,6 +2625,7 @@ function DataPanel({ data, up }) {
           group: kGroup ? String(r[kGroup]).trim() : "",
           invitedPax: pax,
           invitedBabies: kBaby ? Math.min(num(r[kBaby]), pax) : 0,
+          members: members.length ? members : undefined,
           phone: kPhone ? String(r[kPhone]).trim() : "",
           rsvp: "pending",
           confirmedPax: "",
@@ -2587,7 +2735,8 @@ function DataPanel({ data, up }) {
           <div style={{ ...serif, fontSize: 18, fontWeight: 600 }}>⬆️ Import guest list</div>
           <p className="text-xs mt-1 mb-3" style={{ color: C.muted }}>
             Already have names in Excel or Google Sheets? Upload the file (.xlsx / .csv) and they'll be added as
-            pending guests. Recognised columns: <b>Name</b> (required), Side, Group, Pax, Babies, Phone.
+            pending guests. Recognised columns: <b>Name</b> (required), Side, Group, Pax, Babies, Phone, Members
+            (comma-separated names under that invite).
           </p>
           <input
             ref={guestFileRef}
@@ -2853,6 +3002,27 @@ function GuestLeaf({ g }) {
           <span className="text-xs" style={{ color: C.gold }} title={g.dietary}>
             🍽 {g.dietary}
           </span>
+        )}
+        {(g.members || []).length > 0 && (
+          <div className="w-full text-xs" style={{ paddingLeft: 16 }}>
+            {g.members.map((m, i) => {
+              const known = g.rsvp === "yes" && Array.isArray(g.confirmedMembers);
+              const coming = known ? g.confirmedMembers.includes(m) : null;
+              return (
+                <span
+                  key={m}
+                  style={{
+                    color: coming === true ? C.green : C.muted,
+                    textDecoration: coming === false ? "line-through" : "none",
+                  }}
+                >
+                  {i > 0 ? ", " : "└ "}
+                  {m}
+                  {coming === true ? " ✓" : ""}
+                </span>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
