@@ -2162,7 +2162,7 @@ function Overview({ stats, data, setTab, side }) {
 
 // ---------- guests & rsvp ----------
 function Guests({ data, up, side }) {
-  const [form, setForm] = useState({ name: "", side: side || "bride", group: "", invitedPax: 2, phone: "", members: [{ name: "", type: "adult" }] });
+  const [form, setForm] = useState({ name: "", side: side || "bride", group: "", invitedPax: 1, phone: "", members: [{ name: "", type: "adult" }] });
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [view, setView] = useState("list");
@@ -2204,7 +2204,7 @@ function Guests({ data, up, side }) {
       giftNote: "",
     };
     up({ guests: [g, ...data.guests] });
-    setForm({ name: "", side: side || form.side, group: form.group, invitedPax: 2, phone: "", members: [{ name: "", type: "adult" }] });
+    setForm({ name: "", side: side || form.side, group: form.group, invitedPax: 1, phone: "", members: [{ name: "", type: "adult" }] });
   };
 
   // planners tick off who from a family is coming; confirmed pax and babies follow
@@ -2318,15 +2318,17 @@ function Guests({ data, up, side }) {
             <input style={inputStyle} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="e.g. 012-345 6789" />
           </Field>
           <div className="md:col-span-2 pb-2 text-sm" style={{ color: C.muted }}>
-            This invite:{" "}
-            <b style={{ color: C.green }}>
-              {formMembers.length > 0
-                ? `${formMembers.length} pax${formBabies > 0 ? ` · ${formBabies} 👶` : ""}`
-                : `${num(form.invitedPax) || 1} pax`}
-            </b>
+            {formMembers.length > 0 && (
+              <>
+                This invite:{" "}
+                <b style={{ color: C.green }}>
+                  {formMembers.length} pax{formBabies > 0 ? ` · ${formBabies} 👶` : ""}
+                </b>
+              </>
+            )}
             {!form.name.trim() && (
               <span className="text-xs" style={{ color: C.red }}>
-                {" "}— fill in the family / invite name above first
+                {formMembers.length > 0 ? " — " : ""}fill in the family / invite name above first
               </span>
             )}
           </div>
