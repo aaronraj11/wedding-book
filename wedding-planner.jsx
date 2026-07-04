@@ -1384,15 +1384,26 @@ function GuestRSVP({ onBack, theme, locked }) {
   };
 
   const choiceBtn = (active, tone) => ({
-    padding: "10px 26px",
-    borderRadius: 999,
+    flex: "1 1 auto",
+    padding: "13px 20px",
+    borderRadius: 14,
     fontWeight: 600,
     fontSize: 15,
     cursor: "pointer",
-    border: `1px solid ${active ? tone : C.line}`,
+    border: `1.5px solid ${active ? tone : C.line}`,
     background: active ? (tone === C.green ? C.greenSoft : C.redSoft) : C.card,
     color: active ? tone : C.muted,
+    transition: "all .15s",
   });
+
+  const cardStyle = {
+    borderRadius: 18,
+    padding: 24,
+    borderTop: `3px solid ${C.gold}`,
+    boxShadow: "0 16px 48px rgba(34, 48, 31, 0.12)",
+  };
+
+  const sectionLabel = { color: C.gold, letterSpacing: 2, fontSize: 11, fontWeight: 700, textTransform: "uppercase" };
 
   const submit = async () => {
     if (!sel || !coming) return;
@@ -1444,35 +1455,55 @@ function GuestRSVP({ onBack, theme, locked }) {
     <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ background: C.ivory, color: C.ink, colorScheme: theme }}>
       <GlobalStyle />
       <div className="w-full max-w-md">
-        <div className="text-center mb-6">
-          <div className="text-xs uppercase tracking-widest mb-1" style={{ color: C.gold }}>
-            ❦ &nbsp;{settings.couple || "Our Wedding"}&nbsp; ❦
+        <div className="text-center mb-7">
+          <div style={{ color: C.gold, fontSize: 20, letterSpacing: 8 }}>✿&nbsp;❦&nbsp;✿</div>
+          <div className="text-xs uppercase mt-3" style={{ color: C.muted, letterSpacing: 5 }}>
+            The wedding of
           </div>
-          <div style={{ ...serif, fontSize: 30, fontWeight: 600 }}>Will you join us?</div>
-          <p className="text-sm mt-1" style={{ color: C.muted }}>{dateStr}</p>
+          <div style={{ ...serif, fontSize: 40, fontWeight: 700, lineHeight: 1.15, color: C.ink }}>
+            {settings.couple || "Our Wedding"}
+          </div>
+          <div className="flex items-center justify-center gap-3 mt-3">
+            <span style={{ width: 44, borderTop: `1px solid ${C.gold}`, display: "inline-block" }} />
+            <span style={{ ...serif, fontStyle: "italic", fontSize: 16, color: C.gold }}>{dateStr}</span>
+            <span style={{ width: 44, borderTop: `1px solid ${C.gold}`, display: "inline-block" }} />
+          </div>
+          <div style={{ ...serif, fontSize: 22, fontWeight: 600, marginTop: 16, color: C.ink }}>
+            Will you join us?
+          </div>
         </div>
 
         {!data ? (
-          <Card>
+          <Card style={cardStyle}>
             <span style={{ color: C.muted }}>Loading…</span>
           </Card>
         ) : done ? (
-          <Card>
-            <div style={{ ...serif, fontSize: 22, fontWeight: 600 }}>
-              {coming === "yes" ? "Wonderful — see you there! 🥂" : "We'll miss you 💛"}
-            </div>
-            <p className="text-sm mt-2" style={{ color: C.muted }}>
-              {sel.name} · {coming === "yes" ? `${num(pax)} pax confirmed` : "declined with our thanks for letting us know"}
-            </p>
-            <div className="mt-4">
-              <Btn onClick={reset}>✓ Done</Btn>
+          <Card style={cardStyle}>
+            <div className="text-center">
+              <div style={{ fontSize: 44, lineHeight: 1 }}>{coming === "yes" ? "🥂" : "💛"}</div>
+              <div style={{ ...serif, fontSize: 26, fontWeight: 700, marginTop: 10 }}>
+                {coming === "yes" ? "Wonderful — see you there!" : "We'll miss you"}
+              </div>
+              <p className="text-sm mt-2" style={{ color: C.muted }}>
+                {sel.name} · {coming === "yes" ? `${num(pax)} pax confirmed` : "declined with our thanks for letting us know"}
+              </p>
+              <div className="mt-5">
+                <Btn kind="gold" onClick={reset}>✓ Done</Btn>
+              </div>
             </div>
           </Card>
         ) : !sel ? (
-          <Card>
-            <Field label="Find your invitation — type your name">
-              <input style={inputStyle} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="e.g. Uncle Lim" autoFocus />
-            </Field>
+          <Card style={cardStyle}>
+            <div className="text-center mb-3" style={{ ...serif, fontSize: 20, fontWeight: 600 }}>
+              Find your invitation
+            </div>
+            <input
+              style={{ ...inputStyle, borderRadius: 999, padding: "13px 20px", textAlign: "center", fontSize: 15 }}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Type your name…"
+              autoFocus
+            />
             <div className="grid gap-2 mt-3">
               {matches.map((g) => (
                 <button
@@ -1505,9 +1536,9 @@ function GuestRSVP({ onBack, theme, locked }) {
             </div>
           </Card>
         ) : (
-          <Card>
+          <Card style={cardStyle}>
             <div className="flex items-center justify-between">
-              <div style={{ ...serif, fontSize: 20, fontWeight: 600 }}>{sel.name}</div>
+              <div style={{ ...serif, fontSize: 24, fontWeight: 700 }}>{sel.name}</div>
               <Btn kind="ghost" small onClick={() => setSel(null)}>
                 Not you?
               </Btn>
@@ -1529,7 +1560,7 @@ function GuestRSVP({ onBack, theme, locked }) {
               <div className="mt-4 grid gap-3">
                 {membersOf(sel).length > 0 ? (
                   <div>
-                    <div className="text-sm font-semibold mb-2">Who's coming? Tap names to toggle</div>
+                    <div className="mb-2" style={sectionLabel}>Who's coming? — tap names to toggle</div>
                     <div className="flex flex-wrap gap-2">
                       {membersOf(sel).map((m) => {
                         const on = selMembers.includes(m.name);
@@ -1566,9 +1597,9 @@ function GuestRSVP({ onBack, theme, locked }) {
                       {num(babies) > 0 ? ` · ${num(babies)} 👶 (babies aren't counted for food)` : ""}
                     </p>
                     {membersOf(sel).filter((m) => selMembers.includes(m.name) && m.type !== "baby").length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-sm font-semibold mb-2">Meal preference 🍽</div>
-                        <div className="grid gap-2">
+                      <div className="mt-4">
+                        <div className="mb-2" style={sectionLabel}>Meal preference</div>
+                        <div className="grid gap-2 p-3" style={{ background: C.soft, border: `1px solid ${C.line}`, borderRadius: 12 }}>
                           {membersOf(sel)
                             .filter((m) => selMembers.includes(m.name) && m.type !== "baby")
                             .map((m) => (
@@ -1622,9 +1653,10 @@ function GuestRSVP({ onBack, theme, locked }) {
                     </p>
                   </>
                 )}
-                <Field label="Notes (optional)">
-                  <input style={inputStyle} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Halal, allergies, baby chair, anything we should know…" />
-                </Field>
+                <div>
+                  <div className="mb-2" style={sectionLabel}>Notes (optional)</div>
+                  <input style={{ ...inputStyle, borderRadius: 12, padding: "11px 14px" }} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Halal, allergies, baby chair, anything we should know…" />
+                </div>
               </div>
             )}
 
@@ -1634,9 +1666,25 @@ function GuestRSVP({ onBack, theme, locked }) {
               </div>
             )}
             <div className="mt-5">
-              <Btn onClick={submit} disabled={busy || !coming || (coming === "yes" && !num(pax))}>
+              <button
+                onClick={submit}
+                disabled={busy || !coming || (coming === "yes" && !num(pax))}
+                style={{
+                  width: "100%",
+                  padding: "14px 16px",
+                  borderRadius: 999,
+                  fontSize: 16,
+                  fontWeight: 700,
+                  border: "1px solid transparent",
+                  cursor: busy || !coming || (coming === "yes" && !num(pax)) ? "not-allowed" : "pointer",
+                  opacity: busy || !coming || (coming === "yes" && !num(pax)) ? 0.5 : 1,
+                  background: C.gold,
+                  color: C.onGold,
+                  transition: "opacity .15s",
+                }}
+              >
                 {busy ? "Sending…" : "Send reply 💌"}
-              </Btn>
+              </button>
             </div>
           </Card>
         )}
