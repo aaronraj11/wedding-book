@@ -201,6 +201,13 @@ const guestInEvent = (g, evId) => !evId || !g.events || g.events.length === 0 ||
 // "Nathan Mama, Vicky Mami; Prabhu" -> ["Nathan Mama", "Vicky Mami", "Prabhu"]
 const parseMembers = (s) => (s || "").split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
 
+// members were once plain name strings; now they're { name, type: "adult"|"baby" }
+const asMember = (m) => (typeof m === "string" ? { name: m, type: "adult" } : { type: "adult", ...m });
+const membersOf = (g) => (g.members || []).map(asMember).filter((m) => m.name && m.name.trim());
+const babyCount = (list) => list.filter((m) => m.type === "baby").length;
+
+const GROUP_PRESETS = ["Immediate family", "Extended family", "Friends", "Colleagues", "Church family", "Neighbours"];
+
 const defaultEvents = (settings) => [{ id: "ev-" + uid(), name: "Wedding Day", icon: "💒", date: (settings && settings.date) || "" }];
 
 const DEFAULT_TEMPLATE = `Dear {name} 💕
@@ -257,21 +264,36 @@ function Field({ label, children, className = "" }) {
   );
 }
 
-// free-typing input for a member list — parses to an array only on blur so commas don't fight the cursor
-function MembersInput({ value, onChange, width }) {
-  const joined = (value || []).join(", ");
-  const [text, setText] = useState(joined);
-  useEffect(() => {
-    setText(joined);
-  }, [joined]);
+// one row per family member: name box + adult/baby selector, with add/remove
+function MemberRows({ members, onChange }) {
+  const rows = members;
+  const set = (i, p) => onChange(rows.map((m, j) => (j === i ? { ...m, ...p } : m)));
+  const removeRow = (i) => onChange(rows.filter((_, j) => j !== i));
   return (
-    <input
-      style={{ ...inputStyle, width: width || 260 }}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => onChange(parseMembers(text))}
-      placeholder="e.g. Nathan Mama, Vicky Mami, Prabhu"
-    />
+    <div className="grid gap-2">
+      {rows.map((m, i) => (
+        <div key={i} className="flex gap-2 items-center flex-wrap">
+          <input
+            style={{ ...inputStyle, width: 220 }}
+            value={m.name}
+            placeholder={`Member ${i + 1} — name`}
+            onChange={(e) => set(i, { name: e.target.value })}
+          />
+          <select style={{ ...inputStyle, width: 110 }} value={m.type || "adult"} onChange={(e) => set(i, { type: e.target.value })}>
+            <option value="adult">Adult</option>
+            <option value="baby">Baby 👶</option>
+          </select>
+          <Btn kind="danger" small onClick={() => removeRow(i)}>
+            ✕
+          </Btn>
+        </div>
+      ))}
+      <div>
+        <Btn kind="ghost" small onClick={() => onChange([...rows, { name: "", type: "adult" }])}>
+          ＋ Add member
+        </Btn>
+      </div>
+    </div>
   );
 }
 
@@ -1028,6 +1050,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
   const [sel, setSel] = useState(null);
   const [pax, setPax] = useState("");
   const [babies, setBabies] = useState("");
+  const [checkedMembers, setCheckedMembers] = useState([]);
   const [giftIntent, setGiftIntent] = useState(null); // null | "yes" | "no"
   const [method, setMethod] = useState(null); // "cash" | "qr"
   const [amount, setAmount] = useState("");
@@ -1055,6 +1078,14 @@ function GuestCheckIn({ onBack, theme, locked }) {
     setSel(g);
     setPax(String(num(g.confirmedPax || g.invitedPax) || 1));
     setBabies(String(g.confirmedBabies === "" || g.confirmedBabies === undefined ? num(g.invitedBabies) : num(g.confirmedBabies)));
+    const mm = membersOf(g);
+    const names = mm.map((m) => m.name);
+    const start = g.rsvp === "yes" && Array.isArray(g.confirmedMembers) ? g.confirmedMembers.filter((x) => names.includes(x)) : [...names];
+    setCheckedMembers(start);
+    if (names.length) {
+      setPax(String(start.length || 1));
+      setBabies(String(babyCount(mm.filter((x) => start.includes(x.name)))));
+    }
     setGiftIntent(null);
     setMethod(null);
     setAmount("");
@@ -1087,6 +1118,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
               checkedInAt: Date.now(),
               checkedInPax: num(pax) || 1,
               checkedInBabies: Math.min(num(babies), num(pax) || 1),
+              ...(membersOf(sel).length > 0 ? { checkedInMembers: checkedMembers } : {}),
               pledgeAmount: giftIntent === "yes" ? num(amount) : 0,
               pledgeMethod: giftIntent === "yes" ? method || "cash" : "",
             }
@@ -1149,6 +1181,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
                   setSearch("");
                   setPax("");
                   setBabies("");
+                  setCheckedMembers([]);
                   setGiftIntent(null);
                   setMethod(null);
                   setAmount("");
@@ -1199,25 +1232,60 @@ function GuestCheckIn({ onBack, theme, locked }) {
             <p className="text-xs mt-1" style={{ color: C.muted }}>
               Invited: {sel.invitedPax} pax{sel.checkedInAt ? " · you've checked in before — this will update it" : ""}
             </p>
-            {(sel.members || []).length > 0 && (
-              <p className="text-xs mt-1" style={{ color: C.muted }}>
-                Party: {(sel.rsvp === "yes" && Array.isArray(sel.confirmedMembers) && sel.confirmedMembers.length ? sel.confirmedMembers : sel.members).join(", ")}
-              </p>
-            )}
-
-            <div className="mt-4">
-              <div className="flex gap-3 flex-wrap items-end">
-                <Field label="How many of you are here today? (everyone, incl. babies)">
-                  <input style={{ ...inputStyle, width: 130 }} type="number" min="1" value={pax} onChange={(e) => setPax(e.target.value)} />
-                </Field>
-                <Field label="…of which babies 👶">
-                  <input style={{ ...inputStyle, width: 110 }} type="number" min="0" value={babies} onChange={(e) => setBabies(e.target.value)} />
-                </Field>
+            {membersOf(sel).length > 0 ? (
+              <div className="mt-4">
+                <div className="text-sm font-semibold mb-2">Who's here? Tap names</div>
+                <div className="flex flex-wrap gap-2">
+                  {membersOf(sel).map((m) => {
+                    const on = checkedMembers.includes(m.name);
+                    return (
+                      <button
+                        key={m.name}
+                        onClick={() => {
+                          const next = on ? checkedMembers.filter((x) => x !== m.name) : [...checkedMembers, m.name];
+                          setCheckedMembers(next);
+                          setPax(String(next.length || 1));
+                          setBabies(String(babyCount(membersOf(sel).filter((x) => next.includes(x.name)))));
+                        }}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: 999,
+                          fontSize: 14,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          border: `1px solid ${on ? C.green : C.line}`,
+                          background: on ? C.greenSoft : C.card,
+                          color: on ? C.green : C.muted,
+                          textDecoration: on ? "none" : "line-through",
+                        }}
+                      >
+                        {on ? "✓ " : ""}
+                        {m.name}
+                        {m.type === "baby" ? " 👶" : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs mt-2" style={{ color: C.muted }}>
+                  Here now: <b style={{ color: C.green }}>{checkedMembers.length} pax</b>
+                  {num(babies) > 0 ? ` · ${num(babies)} 👶` : ""}
+                </p>
               </div>
-              <p className="text-xs mt-1" style={{ color: C.muted }}>
-                Please count everyone in the total — babies are noted separately so no seat's worth of food is prepared for them.
-              </p>
-            </div>
+            ) : (
+              <div className="mt-4">
+                <div className="flex gap-3 flex-wrap items-end">
+                  <Field label="How many of you are here today? (everyone, incl. babies)">
+                    <input style={{ ...inputStyle, width: 130 }} type="number" min="1" value={pax} onChange={(e) => setPax(e.target.value)} />
+                  </Field>
+                  <Field label="…of which babies 👶">
+                    <input style={{ ...inputStyle, width: 110 }} type="number" min="0" value={babies} onChange={(e) => setBabies(e.target.value)} />
+                  </Field>
+                </div>
+                <p className="text-xs mt-1" style={{ color: C.muted }}>
+                  Please count everyone in the total — babies are noted separately so no seat's worth of food is prepared for them.
+                </p>
+              </div>
+            )}
 
             <div className="mt-4">
               <div className="text-sm font-semibold mb-2">Would you like to provide the couple with a monetary gift? 💝</div>
@@ -1317,10 +1385,9 @@ function GuestRSVP({ onBack, theme, locked }) {
     setPax(String(num(g.confirmedPax || g.invitedPax) || 1));
     setBabies(String(g.confirmedBabies === "" || g.confirmedBabies === undefined ? num(g.invitedBabies) : num(g.confirmedBabies)));
     setDietary(g.dietary || "");
+    const names = membersOf(g).map((m) => m.name);
     setSelMembers(
-      Array.isArray(g.confirmedMembers)
-        ? g.confirmedMembers.filter((m) => (g.members || []).includes(m))
-        : [...(g.members || [])]
+      Array.isArray(g.confirmedMembers) ? g.confirmedMembers.filter((m) => names.includes(m)) : [...names]
     );
     setErr("");
   };
@@ -1353,7 +1420,7 @@ function GuestRSVP({ onBack, theme, locked }) {
                 confirmedBabies: String(num(babies)),
                 dietary: dietary.trim(),
                 rsvpAt: Date.now(),
-                ...((sel.members || []).length > 0 ? { confirmedMembers: selMembers } : {}),
+                ...(membersOf(sel).length > 0 ? { confirmedMembers: selMembers } : {}),
               }
             : { ...g, rsvp: "no", confirmedPax: "", confirmedBabies: "", rsvpAt: Date.now() }
           : g
@@ -1459,19 +1526,20 @@ function GuestRSVP({ onBack, theme, locked }) {
 
             {coming === "yes" && (
               <div className="mt-4 grid gap-3">
-                {(sel.members || []).length > 0 && (
+                {membersOf(sel).length > 0 ? (
                   <div>
                     <div className="text-sm font-semibold mb-2">Who's coming? Tap names to toggle</div>
                     <div className="flex flex-wrap gap-2">
-                      {sel.members.map((m) => {
-                        const on = selMembers.includes(m);
+                      {membersOf(sel).map((m) => {
+                        const on = selMembers.includes(m.name);
                         return (
                           <button
-                            key={m}
+                            key={m.name}
                             onClick={() => {
-                              const next = on ? selMembers.filter((x) => x !== m) : [...selMembers, m];
+                              const next = on ? selMembers.filter((x) => x !== m.name) : [...selMembers, m.name];
                               setSelMembers(next);
                               setPax(String(next.length || 1));
+                              setBabies(String(babyCount(membersOf(sel).filter((x) => next.includes(x.name)))));
                             }}
                             style={{
                               padding: "6px 14px",
@@ -1486,25 +1554,33 @@ function GuestRSVP({ onBack, theme, locked }) {
                             }}
                           >
                             {on ? "✓ " : ""}
-                            {m}
+                            {m.name}
+                            {m.type === "baby" ? " 👶" : ""}
                           </button>
                         );
                       })}
                     </div>
+                    <p className="text-xs mt-2" style={{ color: C.muted }}>
+                      Coming: <b style={{ color: C.green }}>{selMembers.length} pax</b>
+                      {num(babies) > 0 ? ` · ${num(babies)} 👶 (babies aren't counted for food)` : ""}
+                    </p>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex gap-3 flex-wrap items-end">
+                      <Field label="How many of you are coming? (everyone, incl. babies)">
+                        <input style={{ ...inputStyle, width: 130 }} type="number" min="1" max={num(sel.invitedPax) || undefined} value={pax} onChange={(e) => setPax(e.target.value)} />
+                      </Field>
+                      <Field label="…of which babies 👶">
+                        <input style={{ ...inputStyle, width: 110 }} type="number" min="0" value={babies} onChange={(e) => setBabies(e.target.value)} />
+                      </Field>
+                    </div>
+                    <p className="text-xs" style={{ color: C.muted, marginTop: -4 }}>
+                      Count everyone in the total — e.g. 3 adults + 1 baby = 4, of which 1 baby. Babies are noted so no
+                      seat's worth of food is prepared for them.
+                    </p>
+                  </>
                 )}
-                <div className="flex gap-3 flex-wrap items-end">
-                  <Field label="How many of you are coming? (everyone, incl. babies)">
-                    <input style={{ ...inputStyle, width: 130 }} type="number" min="1" max={num(sel.invitedPax) || undefined} value={pax} onChange={(e) => setPax(e.target.value)} />
-                  </Field>
-                  <Field label="…of which babies 👶">
-                    <input style={{ ...inputStyle, width: 110 }} type="number" min="0" value={babies} onChange={(e) => setBabies(e.target.value)} />
-                  </Field>
-                </div>
-                <p className="text-xs" style={{ color: C.muted, marginTop: -4 }}>
-                  Count everyone in the total — e.g. 3 adults + 1 baby = 4, of which 1 baby. Babies are noted so no
-                  seat's worth of food is prepared for them.
-                </p>
                 <Field label="Dietary needs / notes (optional)">
                   <input style={inputStyle} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Vegetarian, halal, no beef, baby chair…" />
                 </Field>
@@ -2046,15 +2122,15 @@ function Overview({ stats, data, setTab, side }) {
 
 // ---------- guests & rsvp ----------
 function Guests({ data, up, side }) {
-  const [form, setForm] = useState({ name: "", side: side || "bride", group: "", invitedPax: 2, invitedBabies: 0, phone: "", members: "" });
+  const [form, setForm] = useState({ name: "", side: side || "bride", group: "", invitedPax: 2, phone: "", members: [{ name: "", type: "adult" }] });
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [view, setView] = useState("list");
   const [editId, setEditId] = useState(null);
 
-  // every existing group path and each of its parent levels, for the autocomplete dropdown
+  // preset categories plus every group path already in use, for the autocomplete dropdown
   const groupOptions = useMemo(() => {
-    const set = new Set();
+    const set = new Set(GROUP_PRESETS);
     data.guests.forEach((g) => {
       const parts = (g.group || "").split("/").map((p) => p.trim()).filter(Boolean);
       for (let i = 1; i <= parts.length; i++) set.add(parts.slice(0, i).join(" / "));
@@ -2066,15 +2142,15 @@ function Guests({ data, up, side }) {
 
   const add = () => {
     if (!form.name.trim() || dupName) return;
-    const members = parseMembers(form.members);
-    const pax = Math.max(num(form.invitedPax) || 1, members.length);
+    const members = form.members.map(asMember).filter((m) => m.name.trim());
+    const pax = members.length > 0 ? members.length : num(form.invitedPax) || 1;
     const g = {
       id: uid(),
       name: form.name.trim(),
       side: side || form.side,
       group: form.group.trim(),
       invitedPax: pax,
-      invitedBabies: Math.min(num(form.invitedBabies), pax),
+      invitedBabies: babyCount(members),
       phone: form.phone.trim(),
       members: members.length ? members : undefined,
       rsvp: "pending",
@@ -2086,14 +2162,29 @@ function Guests({ data, up, side }) {
       giftNote: "",
     };
     up({ guests: [g, ...data.guests] });
-    setForm({ name: "", side: side || form.side, group: form.group, invitedPax: 2, invitedBabies: 0, phone: "", members: "" });
+    setForm({ name: "", side: side || form.side, group: form.group, invitedPax: 2, phone: "", members: [{ name: "", type: "adult" }] });
   };
 
-  // planners tick off who from a family is coming; confirmed pax follows the count
-  const toggleMember = (g, m) => {
-    const base = Array.isArray(g.confirmedMembers) ? g.confirmedMembers : [...(g.members || [])];
-    const next = base.includes(m) ? base.filter((x) => x !== m) : [...base, m];
-    patch(g.id, { confirmedMembers: next, confirmedPax: next.length });
+  // planners tick off who from a family is coming; confirmed pax and babies follow
+  const toggleMember = (g, name) => {
+    const mm = membersOf(g);
+    const names = mm.map((x) => x.name);
+    const base = Array.isArray(g.confirmedMembers) ? g.confirmedMembers.filter((x) => names.includes(x)) : [...names];
+    const next = base.includes(name) ? base.filter((x) => x !== name) : [...base, name];
+    patch(g.id, {
+      confirmedMembers: next,
+      confirmedPax: next.length,
+      confirmedBabies: String(babyCount(mm.filter((x) => next.includes(x.name)))),
+    });
+  };
+
+  // editing a guest's member rows keeps the invite's pax and baby counts in step
+  const patchMembers = (g, rows) => {
+    const named = rows.map(asMember).filter((m) => m.name.trim());
+    patch(g.id, {
+      members: rows.length ? rows : undefined,
+      ...(named.length ? { invitedPax: named.length, invitedBabies: babyCount(named) } : {}),
+    });
   };
 
   const patch = (id, p) => up({ guests: data.guests.map((g) => (g.id === id ? { ...g, ...p } : g)) });
@@ -2156,38 +2247,57 @@ function Guests({ data, up, side }) {
               </select>
             </Field>
           )}
-          <Field label="Group / relation">
-            <input style={inputStyle} list="group-suggestions" value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value })} placeholder="Dad's family / Uncle Ravi's family — use / to nest" />
-          </Field>
-          <Field label="Invited pax">
-            <input style={inputStyle} type="number" min="1" value={form.invitedPax} onChange={(e) => setForm({ ...form, invitedPax: e.target.value })} />
-          </Field>
-          <Field label="…of which babies 👶">
-            <input style={inputStyle} type="number" min="0" value={form.invitedBabies} onChange={(e) => setForm({ ...form, invitedBabies: e.target.value })} />
-          </Field>
-        </div>
-        <p className="text-xs mt-2" style={{ color: C.muted }}>
-          Babies are counted in the invite (e.g. 4 pax, 1 baby) but excluded from the catering headcount — they don't take a seat's worth of food.
-        </p>
-        <div className="grid md:grid-cols-5 gap-3 items-end mt-3">
-          <Field label="Family members (optional, comma-separated)" className="md:col-span-2">
+          <Field label="Group / relation" className="md:col-span-2">
             <input
               style={inputStyle}
-              value={form.members}
-              onChange={(e) => setForm({ ...form, members: e.target.value })}
-              placeholder="e.g. Nathan Mama, Vicky Mami, Prabhu, Arvind, Pravin"
+              list="group-suggestions"
+              value={form.group}
+              onChange={(e) => setForm({ ...form, group: e.target.value })}
+              placeholder="Immediate family, Friends, Pastors from FGA… — pick or type your own"
             />
           </Field>
+          {form.members.map(asMember).filter((m) => m.name.trim()).length === 0 && (
+            <Field label="Invited pax">
+              <input style={inputStyle} type="number" min="1" value={form.invitedPax} onChange={(e) => setForm({ ...form, invitedPax: e.target.value })} />
+            </Field>
+          )}
+        </div>
+
+        <div className="mt-3 p-3" style={{ background: C.soft, border: `1px dashed ${C.line}`, borderRadius: 10 }}>
+          <div className="text-xs uppercase tracking-wider mb-2" style={{ color: C.muted }}>
+            Family members under this invite
+          </div>
+          <MemberRows members={form.members} onChange={(rows) => setForm({ ...form, members: rows })} />
+          <p className="text-xs mt-2" style={{ color: C.muted }}>
+            One box per person — mark each as an adult or a baby 👶. Babies are part of the invite but excluded from
+            the catering headcount. The pax count follows these boxes automatically. (No names? Leave this empty and
+            just set an invited-pax number.)
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-5 gap-3 items-end mt-3">
           <Field label="Phone (optional)" className="md:col-span-2">
             <input style={inputStyle} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="e.g. 012-345 6789" />
           </Field>
+          <div className="md:col-span-2 pb-2 text-sm" style={{ color: C.muted }}>
+            {form.members.map(asMember).filter((m) => m.name.trim()).length > 0 && (
+              <>
+                This invite:{" "}
+                <b style={{ color: C.green }}>
+                  {form.members.map(asMember).filter((m) => m.name.trim()).length} pax
+                  {babyCount(form.members.map(asMember).filter((m) => m.name.trim())) > 0
+                    ? ` · ${babyCount(form.members.map(asMember).filter((m) => m.name.trim()))} 👶`
+                    : ""}
+                </b>
+              </>
+            )}
+          </div>
           <div>
             <Btn onClick={add}>Add guest</Btn>
           </div>
         </div>
         <p className="text-xs mt-2" style={{ color: C.muted }}>
-          Name the people under this invite and the pax count follows automatically. Once they RSVP, you (or they, via
-          the RSVP link) can tick exactly who's coming.
+          Once this family RSVPs, you (or they, via the RSVP link) tick exactly who's coming, name by name.
         </p>
       </Card>
 
@@ -2326,18 +2436,18 @@ function Guests({ data, up, side }) {
               </Btn>
             </div>
           </div>
-          {(g.members || []).length > 0 && (
+          {membersOf(g).length > 0 && (
             <div className="flex flex-wrap items-center gap-1 mt-2">
               <span className="text-xs mr-1" style={{ color: C.muted }}>
                 👨‍👩‍👧
               </span>
-              {g.members.map((m) => {
+              {membersOf(g).map((m) => {
                 const known = g.rsvp === "yes" && Array.isArray(g.confirmedMembers);
-                const coming = known ? g.confirmedMembers.includes(m) : null;
+                const coming = known ? g.confirmedMembers.includes(m.name) : null;
                 return (
                   <button
-                    key={m}
-                    onClick={() => g.rsvp === "yes" && toggleMember(g, m)}
+                    key={m.name}
+                    onClick={() => g.rsvp === "yes" && toggleMember(g, m.name)}
                     title={g.rsvp === "yes" ? "Tap to toggle whether this person is coming" : "Set RSVP to Attending to tick people off"}
                     style={{
                       padding: "3px 10px",
@@ -2352,7 +2462,8 @@ function Guests({ data, up, side }) {
                     }}
                   >
                     {coming === true ? "✓ " : ""}
-                    {m}
+                    {m.name}
+                    {m.type === "baby" ? " 👶" : ""}
                   </button>
                 );
               })}
@@ -2377,28 +2488,22 @@ function Guests({ data, up, side }) {
                 </Field>
               )}
               <Field label="Group / relation">
-                <input style={{ ...inputStyle, width: 230 }} list="group-suggestions" value={g.group || ""} onChange={(e) => patch(g.id, { group: e.target.value })} placeholder="e.g. Dad's family / Uncle Ravi's family" />
+                <input style={{ ...inputStyle, width: 230 }} list="group-suggestions" value={g.group || ""} onChange={(e) => patch(g.id, { group: e.target.value })} placeholder="Immediate family, Friends, or your own" />
               </Field>
-              <Field label="Members (comma-separated)">
-                <MembersInput
-                  value={g.members}
-                  onChange={(m) =>
-                    patch(g.id, {
-                      members: m.length ? m : undefined,
-                      invitedPax: Math.max(num(g.invitedPax) || 1, m.length),
-                    })
-                  }
-                />
-              </Field>
-              <Field label="Invited pax">
-                <input style={{ ...inputStyle, width: 90 }} type="number" min="1" value={g.invitedPax} onChange={(e) => patch(g.id, { invitedPax: e.target.value })} />
-              </Field>
-              <Field label="…of which babies 👶">
-                <input style={{ ...inputStyle, width: 90 }} type="number" min="0" value={g.invitedBabies} onChange={(e) => patch(g.id, { invitedBabies: e.target.value })} />
-              </Field>
+              {membersOf(g).length === 0 && (
+                <Field label="Invited pax">
+                  <input style={{ ...inputStyle, width: 90 }} type="number" min="1" value={g.invitedPax} onChange={(e) => patch(g.id, { invitedPax: e.target.value })} />
+                </Field>
+              )}
               <Field label="Phone">
                 <input style={{ ...inputStyle, width: 150 }} value={g.phone || ""} onChange={(e) => patch(g.id, { phone: e.target.value })} />
               </Field>
+              <div className="w-full">
+                <div className="text-xs uppercase tracking-wider mb-2" style={{ color: C.muted }}>
+                  Family members (adult or baby 👶 — pax follows these boxes)
+                </div>
+                <MemberRows members={(g.members || []).map(asMember)} onChange={(rows) => patchMembers(g, rows)} />
+              </div>
             </div>
           )}
           {(data.events || []).length > 1 && (
@@ -2513,7 +2618,7 @@ function DataPanel({ data, up }) {
       Group: g.group || "",
       "Invited Pax": num(g.invitedPax),
       Babies: num(g.invitedBabies),
-      Members: (g.members || []).join(", "),
+      Members: membersOf(g).map((m) => m.name + (m.type === "baby" ? " (baby)" : "")).join(", "),
       Phone: g.phone || "",
       "Invited To": !g.events || g.events.length === 0 ? "All events" : (data.events || []).filter((e) => g.events.includes(e.id)).map((e) => e.name).join(", "),
       RSVP: g.rsvp === "yes" ? "Attending" : g.rsvp === "no" ? "Declined" : "Pending",
@@ -2616,7 +2721,7 @@ function DataPanel({ data, up }) {
           return;
         }
         const sideRaw = kSide ? String(r[kSide]).toLowerCase() : "";
-        const members = kMembers ? parseMembers(String(r[kMembers])) : [];
+        const members = kMembers ? parseMembers(String(r[kMembers])).map((n) => ({ name: n, type: "adult" })) : [];
         const pax = Math.max(kPax ? num(r[kPax]) || 1 : 1, members.length);
         newGuests.push({
           id: uid(),
@@ -3003,21 +3108,22 @@ function GuestLeaf({ g }) {
             🍽 {g.dietary}
           </span>
         )}
-        {(g.members || []).length > 0 && (
+        {membersOf(g).length > 0 && (
           <div className="w-full text-xs" style={{ paddingLeft: 16 }}>
-            {g.members.map((m, i) => {
+            {membersOf(g).map((m, i) => {
               const known = g.rsvp === "yes" && Array.isArray(g.confirmedMembers);
-              const coming = known ? g.confirmedMembers.includes(m) : null;
+              const coming = known ? g.confirmedMembers.includes(m.name) : null;
               return (
                 <span
-                  key={m}
+                  key={m.name}
                   style={{
                     color: coming === true ? C.green : C.muted,
                     textDecoration: coming === false ? "line-through" : "none",
                   }}
                 >
                   {i > 0 ? ", " : "└ "}
-                  {m}
+                  {m.name}
+                  {m.type === "baby" ? " 👶" : ""}
                   {coming === true ? " ✓" : ""}
                 </span>
               );
@@ -3777,8 +3883,13 @@ function DayOf({ data, up, side }) {
                   {num(g.pledgeAmount) > 0 && (
                     <Pill tone="gold">💝 {RM(g.pledgeAmount)} · {g.pledgeMethod === "qr" ? "QR" : "cash"}</Pill>
                   )}
+                  {Array.isArray(g.checkedInMembers) && g.checkedInMembers.length > 0 && (
+                    <span className="text-xs" style={{ color: C.muted }}>
+                      {g.checkedInMembers.join(", ")}
+                    </span>
+                  )}
                   <div className="ml-auto">
-                    <Btn kind="danger" small onClick={() => patch(g.id, { checkedInAt: null, checkedInPax: null, checkedInBabies: null })}>
+                    <Btn kind="danger" small onClick={() => patch(g.id, { checkedInAt: null, checkedInPax: null, checkedInBabies: null, checkedInMembers: null })}>
                       Undo check-in
                     </Btn>
                   </div>
