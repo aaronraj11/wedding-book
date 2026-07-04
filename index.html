@@ -1026,6 +1026,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
   const [search, setSearch] = useState("");
   const [sel, setSel] = useState(null);
   const [pax, setPax] = useState("");
+  const [babies, setBabies] = useState("");
   const [giftIntent, setGiftIntent] = useState(null); // null | "yes" | "no"
   const [method, setMethod] = useState(null); // "cash" | "qr"
   const [amount, setAmount] = useState("");
@@ -1052,6 +1053,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
   const pick = (g) => {
     setSel(g);
     setPax(String(num(g.confirmedPax || g.invitedPax) || 1));
+    setBabies(String(g.confirmedBabies === "" || g.confirmedBabies === undefined ? num(g.invitedBabies) : num(g.confirmedBabies)));
     setGiftIntent(null);
     setMethod(null);
     setAmount("");
@@ -1083,6 +1085,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
               ...g,
               checkedInAt: Date.now(),
               checkedInPax: num(pax) || 1,
+              checkedInBabies: Math.min(num(babies), num(pax) || 1),
               pledgeAmount: giftIntent === "yes" ? num(amount) : 0,
               pledgeMethod: giftIntent === "yes" ? method || "cash" : "",
             }
@@ -1132,7 +1135,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
           <Card>
             <div style={{ ...serif, fontSize: 22, fontWeight: 600 }}>You're checked in! 🎉</div>
             <p className="text-sm mt-2" style={{ color: C.muted }}>
-              {sel.name} · {num(pax)} pax
+              {sel.name} · {num(pax)} pax{num(babies) > 0 ? ` (${num(babies)} 👶)` : ""}
               {giftIntent === "yes" && num(amount) > 0 ? ` · gift ${RM(amount)} (${method === "qr" ? "QR" : "cash"})` : ""}
             </p>
             {giftIntent === "yes" && method === "qr" && qrBlock}
@@ -1144,6 +1147,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
                   setSel(null);
                   setSearch("");
                   setPax("");
+                  setBabies("");
                   setGiftIntent(null);
                   setMethod(null);
                   setAmount("");
@@ -1196,9 +1200,17 @@ function GuestCheckIn({ onBack, theme, locked }) {
             </p>
 
             <div className="mt-4">
-              <Field label="How many of you are here today?">
-                <input style={{ ...inputStyle, width: 120 }} type="number" min="1" value={pax} onChange={(e) => setPax(e.target.value)} />
-              </Field>
+              <div className="flex gap-3 flex-wrap items-end">
+                <Field label="How many of you are here today? (everyone, incl. babies)">
+                  <input style={{ ...inputStyle, width: 130 }} type="number" min="1" value={pax} onChange={(e) => setPax(e.target.value)} />
+                </Field>
+                <Field label="…of which babies 👶">
+                  <input style={{ ...inputStyle, width: 110 }} type="number" min="0" value={babies} onChange={(e) => setBabies(e.target.value)} />
+                </Field>
+              </div>
+              <p className="text-xs mt-1" style={{ color: C.muted }}>
+                Please count everyone in the total — babies are noted separately so no seat's worth of food is prepared for them.
+              </p>
             </div>
 
             <div className="mt-4">
@@ -1428,13 +1440,17 @@ function GuestRSVP({ onBack, theme, locked }) {
             {coming === "yes" && (
               <div className="mt-4 grid gap-3">
                 <div className="flex gap-3 flex-wrap items-end">
-                  <Field label="How many of you are coming?">
-                    <input style={{ ...inputStyle, width: 120 }} type="number" min="1" max={num(sel.invitedPax) || undefined} value={pax} onChange={(e) => setPax(e.target.value)} />
+                  <Field label="How many of you are coming? (everyone, incl. babies)">
+                    <input style={{ ...inputStyle, width: 130 }} type="number" min="1" max={num(sel.invitedPax) || undefined} value={pax} onChange={(e) => setPax(e.target.value)} />
                   </Field>
                   <Field label="…of which babies 👶">
                     <input style={{ ...inputStyle, width: 110 }} type="number" min="0" value={babies} onChange={(e) => setBabies(e.target.value)} />
                   </Field>
                 </div>
+                <p className="text-xs" style={{ color: C.muted, marginTop: -4 }}>
+                  Count everyone in the total — e.g. 3 adults + 1 baby = 4, of which 1 baby. Babies are noted so no
+                  seat's worth of food is prepared for them.
+                </p>
                 <Field label="Dietary needs / notes (optional)">
                   <input style={inputStyle} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Vegetarian, halal, no beef, baby chair…" />
                 </Field>
@@ -2166,7 +2182,7 @@ function Guests({ data, up, side }) {
             </Pill>
             {g.checkedInAt && (
               <Pill tone={num(g.checkedInPax) === num(g.confirmedPax || g.invitedPax) ? "green" : "red"}>
-                🎟️ {num(g.checkedInPax)} arrived
+                🎟️ {num(g.checkedInPax)} arrived{num(g.checkedInBabies) > 0 ? ` · ${num(g.checkedInBabies)} 👶` : ""}
                 {num(g.checkedInPax) !== num(g.confirmedPax || g.invitedPax) ? ` (expected ${num(g.confirmedPax || g.invitedPax)})` : ""}
               </Pill>
             )}
@@ -2382,6 +2398,7 @@ function DataPanel({ data, up }) {
       Dietary: g.dietary || "",
       "Invite Sent": g.invitedAt ? new Date(g.invitedAt).toLocaleDateString("en-MY") : "",
       "Checked In Pax": g.checkedInAt ? num(g.checkedInPax) : "",
+      "Checked In Babies": g.checkedInAt ? num(g.checkedInBabies) : "",
       "Checked In At": g.checkedInAt ? new Date(g.checkedInAt).toLocaleString("en-MY") : "",
       "Pledged (RM)": num(g.pledgeAmount) || "",
       "Pledge Method": num(g.pledgeAmount) > 0 ? (g.pledgeMethod === "qr" ? "QR" : "cash") : "",
@@ -3558,6 +3575,7 @@ function DayOf({ data, up, side }) {
   const arrived = pool.filter((g) => g.checkedInAt).slice().sort((a, b) => (b.checkedInAt || 0) - (a.checkedInAt || 0));
   const awaited = pool.filter((g) => g.rsvp === "yes" && !g.checkedInAt);
   const arrivedPax = arrived.reduce((s, g) => s + num(g.checkedInPax), 0);
+  const arrivedBabies = arrived.reduce((s, g) => s + Math.min(num(g.checkedInBabies), num(g.checkedInPax)), 0);
   const expectedPax = pool.filter((g) => g.rsvp === "yes").reduce((s, g) => s + num(g.confirmedPax || g.invitedPax || 1), 0);
   const pledgeCash = pool.reduce((s, g) => s + (g.pledgeMethod !== "qr" ? num(g.pledgeAmount) : 0), 0);
   const pledgeQr = pool.reduce((s, g) => s + (g.pledgeMethod === "qr" ? num(g.pledgeAmount) : 0), 0);
@@ -3567,7 +3585,12 @@ function DayOf({ data, up, side }) {
   return (
     <div className="grid gap-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Arrived" value={`${arrivedPax} pax`} sub={`${arrived.length} invites checked in`} tone={C.green} />
+        <Stat
+          label="Arrived"
+          value={`${arrivedPax} pax`}
+          sub={`${arrived.length} invites checked in${arrivedBabies > 0 ? ` · ${arrivedBabies} 👶 · ${arrivedPax - arrivedBabies} eating` : ""}`}
+          tone={C.green}
+        />
         <Stat
           label="Expected"
           value={`${expectedPax} pax`}
@@ -3599,13 +3622,13 @@ function DayOf({ data, up, side }) {
                   <span className="text-sm font-medium">{g.name}</span>
                   {!side && <Pill tone={g.side === "bride" ? "gold" : "green"}>{cap(g.side)}</Pill>}
                   <Pill tone={match ? "green" : "red"}>
-                    {num(g.checkedInPax)} pax{!match ? ` (expected ${expected})` : ""}
+                    {num(g.checkedInPax)} pax{num(g.checkedInBabies) > 0 ? ` · ${num(g.checkedInBabies)} 👶` : ""}{!match ? ` (expected ${expected})` : ""}
                   </Pill>
                   {num(g.pledgeAmount) > 0 && (
                     <Pill tone="gold">💝 {RM(g.pledgeAmount)} · {g.pledgeMethod === "qr" ? "QR" : "cash"}</Pill>
                   )}
                   <div className="ml-auto">
-                    <Btn kind="danger" small onClick={() => patch(g.id, { checkedInAt: null, checkedInPax: null })}>
+                    <Btn kind="danger" small onClick={() => patch(g.id, { checkedInAt: null, checkedInPax: null, checkedInBabies: null })}>
                       Undo check-in
                     </Btn>
                   </div>
