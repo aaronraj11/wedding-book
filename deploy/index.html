@@ -468,17 +468,7 @@ function WeddingApp() {
   if (guestMode === "checkin") return <GuestCheckIn onBack={() => setGuestMode(null)} theme={theme} locked={guestLock} />;
   if (guestMode === "rsvp") return <GuestRSVP onBack={() => setGuestMode(null)} theme={theme} locked={guestLock} />;
   if (!session)
-    return (
-      <Login
-        onLogin={login}
-        theme={theme}
-        toggleTheme={toggleTheme}
-        onGuest={() => setGuestMode("checkin")}
-        onRsvp={() => setGuestMode("rsvp")}
-        onSwitch={switchWedding}
-        wedding={wedding}
-      />
-    );
+    return <Login onLogin={login} theme={theme} toggleTheme={toggleTheme} onSwitch={switchWedding} wedding={wedding} />;
   return <Planner role={session.role} onLogout={logout} theme={theme} toggleTheme={toggleTheme} wedding={wedding} />;
 }
 
@@ -867,7 +857,7 @@ function WeddingGate({ onOpen, theme, toggleTheme, onAdmin }) {
 }
 
 // ---------- login screen ----------
-function Login({ onLogin, theme, toggleTheme, onGuest, onRsvp, onSwitch, wedding }) {
+function Login({ onLogin, theme, toggleTheme, onSwitch, wedding }) {
   const [accounts, setAccounts] = useState(null); // {role: scrambledCode}
   const [picked, setPicked] = useState(null);
   const [code, setCode] = useState("");
@@ -1000,16 +990,6 @@ function Login({ onLogin, theme, toggleTheme, onGuest, onRsvp, onSwitch, wedding
             </div>
           </Card>
         )}
-
-        <div className="text-center mt-5 p-4" style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 12 }}>
-          <div className="text-xs uppercase tracking-widest mb-2" style={{ color: C.muted }}>
-            Invited to the wedding?
-          </div>
-          <div className="flex gap-2 justify-center flex-wrap">
-            <Btn kind="gold" onClick={onRsvp}>💌 RSVP</Btn>
-            <Btn kind="gold" onClick={onGuest}>🎟️ Guest check-in</Btn>
-          </div>
-        </div>
 
         <p className="text-xs text-center mt-4" style={{ color: C.muted }}>
           Wedding data is shared between everyone who signs in to this app. Passcodes are a light lock to keep roles
