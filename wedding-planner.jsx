@@ -109,7 +109,6 @@ const GROUP_PRESETS = [
   "Extended family / Dad's side",
   "Friends",
   "Colleagues",
-  "Church family",
   "Neighbours",
 ];
 
