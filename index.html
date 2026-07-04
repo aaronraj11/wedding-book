@@ -239,6 +239,8 @@ We're getting married! 💍
 
 {couple} warmly invite you ({pax} pax) to celebrate our wedding on {date}.
 
+{location}
+
 Kindly let us know if you can make it — just tap the link below to RSVP:
 {rsvp}
 
@@ -251,12 +253,21 @@ function buildInviteMessage(template, g, settings) {
     ? new Date(settings.date).toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : "(date to be announced)";
   const rsvpLink = `${location.origin}${location.pathname}?w=${WEDDING}&p=rsvp`;
+  const locBlock = [
+    settings.venueName ? `📍 Venue: ${settings.venueName}` : "",
+    settings.venueMaps ? `Google Maps: ${settings.venueMaps}` : "",
+    settings.venueWaze ? `Waze: ${settings.venueWaze}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
   return (template || DEFAULT_TEMPLATE)
     .replace(/\{name\}/g, g.name)
     .replace(/\{couple\}/g, settings.couple || "We")
     .replace(/\{date\}/g, dateStr)
     .replace(/\{pax\}/g, String(num(g.invitedPax) || 1))
-    .replace(/\{rsvp\}/g, rsvpLink);
+    .replace(/\{location\}/g, locBlock)
+    .replace(/\{rsvp\}/g, rsvpLink)
+    .replace(/\n{3,}/g, "\n\n"); // tidy up blank lines when the venue isn't set
 }
 
 // normalise a phone number for wa.me — Malaysian numbers starting with 0 get the 60 prefix
@@ -1589,6 +1600,53 @@ function GuestRSVP({ onBack, theme, locked }) {
             <span style={{ ...serif, fontStyle: "italic", fontSize: 16, color: C.gold }}>{dateStr}</span>
             <span style={{ width: 44, borderTop: `1px solid ${C.gold}`, display: "inline-block" }} />
           </div>
+          {settings.venueName && (
+            <div className="text-sm mt-2" style={{ color: C.muted }}>
+              📍 {settings.venueName}
+            </div>
+          )}
+          {(settings.venueMaps || settings.venueWaze) && (
+            <div className="flex gap-2 justify-center mt-2 flex-wrap">
+              {settings.venueMaps && (
+                <a
+                  href={settings.venueMaps}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: "5px 14px",
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    border: `1px solid ${C.line}`,
+                    background: C.card,
+                    color: C.green,
+                  }}
+                >
+                  🗺️ Google Maps
+                </a>
+              )}
+              {settings.venueWaze && (
+                <a
+                  href={settings.venueWaze}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: "5px 14px",
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    border: `1px solid ${C.line}`,
+                    background: C.card,
+                    color: C.green,
+                  }}
+                >
+                  🚗 Waze
+                </a>
+              )}
+            </div>
+          )}
           <div style={{ ...serif, fontSize: 22, fontWeight: 600, marginTop: 16, color: C.ink }}>
             Will you join us?
           </div>
@@ -3201,6 +3259,32 @@ function InvitePanel({ data, up, pool }) {
         <div className="mt-4 grid md:grid-cols-2 gap-4">
           {/* template editor */}
           <div>
+            <div className="grid gap-3 mb-3">
+              <Field label="Venue name">
+                <input
+                  style={inputStyle}
+                  value={data.settings.venueName || ""}
+                  onChange={(e) => up({ settings: { ...data.settings, venueName: e.target.value } })}
+                  placeholder="e.g. Full Gospel Assembly KL"
+                />
+              </Field>
+              <Field label="Google Maps link">
+                <input
+                  style={inputStyle}
+                  value={data.settings.venueMaps || ""}
+                  onChange={(e) => up({ settings: { ...data.settings, venueMaps: e.target.value } })}
+                  placeholder="https://maps.google.com/…"
+                />
+              </Field>
+              <Field label="Waze link">
+                <input
+                  style={inputStyle}
+                  value={data.settings.venueWaze || ""}
+                  onChange={(e) => up({ settings: { ...data.settings, venueWaze: e.target.value } })}
+                  placeholder="https://waze.com/…"
+                />
+              </Field>
+            </div>
             <Field label="Message template">
               <textarea
                 style={{ ...inputStyle, minHeight: 190, resize: "vertical", fontFamily: "inherit" }}
@@ -3210,9 +3294,10 @@ function InvitePanel({ data, up, pool }) {
             </Field>
             <div className="text-xs mt-2" style={{ color: C.muted }}>
               Placeholders: <b>{"{name}"}</b> guest's name · <b>{"{couple}"}</b> your names · <b>{"{date}"}</b> wedding
-              date · <b>{"{pax}"}</b> their invited pax · <b>{"{rsvp}"}</b> a link where the guest replies directly in
-              the app (their answer updates your list automatically). The template is shared, so set it once and both
-              accountants use the same wording.
+              date · <b>{"{pax}"}</b> their invited pax · <b>{"{location}"}</b> the venue name with Google Maps and
+              Waze links (set above) · <b>{"{rsvp}"}</b> a link where the guest replies directly in the app (their
+              answer updates your list automatically). The template is shared, so set it once and both accountants use
+              the same wording.
             </div>
             <div className="mt-2">
               <Btn kind="ghost" small onClick={() => setTemplate(DEFAULT_TEMPLATE)}>
