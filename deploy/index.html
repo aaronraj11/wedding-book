@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Wedding Book 💍</title>
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#2E4A35" />
+<meta name="theme-color" content="#FAF5F1" />
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
 <link rel="apple-touch-icon" href="icon-192.png" />
 <script src="https://cdn.tailwindcss.com"></script>
@@ -130,48 +130,49 @@ const scramble = (s) => {
   return "h" + h.toString(36);
 };
 
+// pastel wedding palette: blush ivory, sage, champagne gold, dusty rose
 const LIGHT = {
-  ivory: "#FAF7F0",
+  ivory: "#FAF5F1",
   card: "#FFFFFF",
-  soft: "#FFFDF9",
-  neutral: "#F1EDE3",
-  ink: "#22301F",
-  green: "#2E4A35",
-  greenSoft: "#EAF0E8",
-  gold: "#A9812F",
-  goldSoft: "#F5EDDC",
-  line: "#E5DFD2",
-  muted: "#7C7466",
-  red: "#A3402F",
-  redSoft: "#F7E7E2",
+  soft: "#FDFAF7",
+  neutral: "#F2EBE4",
+  ink: "#443F3A",
+  green: "#6B8E7B",
+  greenSoft: "#E8F1EB",
+  gold: "#BC9459",
+  goldSoft: "#F6EEDF",
+  line: "#EAE0D5",
+  muted: "#9A8E82",
+  red: "#B57373",
+  redSoft: "#F8EAEA",
   onGreen: "#FFFFFF",
   onGold: "#FFFFFF",
-  waSoft: "#E9F9EF",
-  waBorder: "#BFE8CC",
-  waText: "#1B4332",
-  waBtn: "#1DA851",
+  waSoft: "#EAF7EF",
+  waBorder: "#C8E6D2",
+  waText: "#2F5D46",
+  waBtn: "#41A868",
 };
 
 const DARK = {
-  ivory: "#161815",
-  card: "#1F221E",
-  soft: "#262A24",
-  neutral: "#2E322B",
-  ink: "#EAE7DC",
-  green: "#8CB897",
-  greenSoft: "#2A3A2E",
-  gold: "#D8B25F",
-  goldSoft: "#3B3320",
-  line: "#3A3E36",
-  muted: "#A39C8C",
-  red: "#E28568",
-  redSoft: "#40241D",
-  onGreen: "#14251A",
-  onGold: "#2A2312",
-  waSoft: "#1E3527",
-  waBorder: "#2E5340",
-  waText: "#BFE8CC",
-  waBtn: "#48C878",
+  ivory: "#1B1917",
+  card: "#252220",
+  soft: "#2B2825",
+  neutral: "#332F2A",
+  ink: "#EDE7DE",
+  green: "#A9C6B2",
+  greenSoft: "#2C382F",
+  gold: "#DFC292",
+  goldSoft: "#3B3323",
+  line: "#3D3833",
+  muted: "#A89D90",
+  red: "#E0A9A4",
+  redSoft: "#40302D",
+  onGreen: "#1B2620",
+  onGold: "#2C2415",
+  waSoft: "#20372A",
+  waBorder: "#335843",
+  waText: "#C4E6CF",
+  waBtn: "#53C07E",
 };
 
 // mutable palette — swapped in place when the theme changes, then the whole tree re-renders
@@ -479,6 +480,63 @@ const GlobalStyle = () => (
   `}</style>
 );
 
+// soft abstract backdrop for the guest-facing pages: blurred pastel washes,
+// faint interlocked rings, and a floral motif — all behind the content
+function Ornaments() {
+  const blob = (key, style) => (
+    <div
+      key={key}
+      style={{
+        position: "fixed",
+        borderRadius: "50%",
+        filter: "blur(70px)",
+        pointerEvents: "none",
+        zIndex: 0,
+        ...style,
+      }}
+    />
+  );
+  return (
+    <>
+      {blob("b1", { width: 360, height: 360, top: -100, left: -120, background: C.goldSoft, opacity: 0.8 })}
+      {blob("b2", { width: 320, height: 320, bottom: -80, right: -100, background: C.greenSoft, opacity: 0.8 })}
+      {blob("b3", { width: 240, height: 240, top: "38%", right: -130, background: C.redSoft, opacity: 0.7 })}
+      {blob("b4", { width: 200, height: 200, bottom: "30%", left: -120, background: C.goldSoft, opacity: 0.55 })}
+      <svg
+        width="230"
+        height="150"
+        viewBox="0 0 230 150"
+        style={{ position: "fixed", top: 20, right: 26, opacity: 0.16, pointerEvents: "none", zIndex: 0 }}
+      >
+        <circle cx="90" cy="75" r="54" fill="none" stroke={C.gold} strokeWidth="2.5" />
+        <circle cx="140" cy="75" r="54" fill="none" stroke={C.gold} strokeWidth="2.5" />
+        <path d="M140 21 l7 -10 M140 21 l-7 -10 M140 21 l0 -13" stroke={C.gold} strokeWidth="2" fill="none" />
+      </svg>
+      <svg
+        width="170"
+        height="170"
+        viewBox="0 0 100 100"
+        style={{ position: "fixed", bottom: 18, left: 20, opacity: 0.14, pointerEvents: "none", zIndex: 0 }}
+      >
+        {[0, 72, 144, 216, 288].map((a) => (
+          <ellipse
+            key={a}
+            cx="50"
+            cy="30"
+            rx="11"
+            ry="20"
+            fill="none"
+            stroke={C.gold}
+            strokeWidth="2"
+            transform={`rotate(${a} 50 50)`}
+          />
+        ))}
+        <circle cx="50" cy="50" r="6" fill="none" stroke={C.gold} strokeWidth="2" />
+      </svg>
+    </>
+  );
+}
+
 // ---------- root: session gate ----------
 function WeddingApp() {
   const [wedding, setWedding] = useState(undefined); // undefined = checking, null = none picked yet
@@ -495,7 +553,7 @@ function WeddingApp() {
   // keep the phone status-bar colour in step with the theme
   useEffect(() => {
     const m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute("content", theme === "dark" ? "#161815" : "#2E4A35");
+    if (m) m.setAttribute("content", theme === "dark" ? "#1B1917" : "#FAF5F1");
   }, [theme]);
 
   useEffect(() => {
@@ -1192,15 +1250,30 @@ function GuestCheckIn({ onBack, theme, locked }) {
   };
 
   const choiceBtn = (active) => ({
-    padding: "8px 22px",
-    borderRadius: 999,
+    flex: "1 1 auto",
+    padding: "12px 20px",
+    borderRadius: 14,
     fontWeight: 600,
-    fontSize: 14,
+    fontSize: 15,
     cursor: "pointer",
-    border: `1px solid ${active ? C.green : C.line}`,
+    border: `1.5px solid ${active ? C.green : C.line}`,
     background: active ? C.greenSoft : C.card,
     color: active ? C.green : C.muted,
+    transition: "all .15s",
   });
+
+  const cardStyle = {
+    borderRadius: 18,
+    padding: 24,
+    borderTop: `3px solid ${C.gold}`,
+    boxShadow: "0 16px 48px rgba(34, 48, 31, 0.12)",
+  };
+
+  const sectionLabel = { color: C.gold, letterSpacing: 2, fontSize: 11, fontWeight: 700, textTransform: "uppercase" };
+
+  const dateStr = settings.date
+    ? new Date(settings.date).toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : "";
 
   const submit = async () => {
     if (!sel) return;
@@ -1251,22 +1324,39 @@ function GuestCheckIn({ onBack, theme, locked }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ background: C.ivory, color: C.ink, colorScheme: theme }}>
       <GlobalStyle />
-      <div className="w-full max-w-md">
-        <div className="text-center mb-6">
-          <div className="text-xs uppercase tracking-widest mb-1" style={{ color: C.gold }}>
-            ❦ &nbsp;{settings.couple || "Our Wedding"}&nbsp; ❦
+      <Ornaments />
+      <div className="w-full max-w-md" style={{ position: "relative", zIndex: 1 }}>
+        <div className="text-center mb-7">
+          <div style={{ color: C.gold, fontSize: 20, letterSpacing: 8 }}>✿&nbsp;❦&nbsp;✿</div>
+          <div className="text-xs uppercase mt-3" style={{ color: C.muted, letterSpacing: 5 }}>
+            The wedding of
           </div>
-          <div style={{ ...serif, fontSize: 30, fontWeight: 600 }}>Guest check-in</div>
+          <div style={{ ...serif, fontSize: 40, fontWeight: 700, lineHeight: 1.15, color: C.ink }}>
+            {settings.couple || "Our Wedding"}
+          </div>
+          {dateStr && (
+            <div className="flex items-center justify-center gap-3 mt-3">
+              <span style={{ width: 44, borderTop: `1px solid ${C.gold}`, display: "inline-block" }} />
+              <span style={{ ...serif, fontStyle: "italic", fontSize: 16, color: C.gold }}>{dateStr}</span>
+              <span style={{ width: 44, borderTop: `1px solid ${C.gold}`, display: "inline-block" }} />
+            </div>
+          )}
+          <div style={{ ...serif, fontSize: 22, fontWeight: 600, marginTop: 16, color: C.ink }}>
+            Guest check-in
+          </div>
         </div>
 
         {!data ? (
-          <Card>
+          <Card style={cardStyle}>
             <span style={{ color: C.muted }}>Loading the guest book…</span>
           </Card>
         ) : done ? (
-          <Card>
-            <div style={{ ...serif, fontSize: 22, fontWeight: 600 }}>You're checked in! 🎉</div>
-            <p className="text-sm mt-2" style={{ color: C.muted }}>
+          <Card style={cardStyle}>
+            <div className="text-center">
+              <div style={{ fontSize: 44, lineHeight: 1 }}>🎉</div>
+              <div style={{ ...serif, fontSize: 26, fontWeight: 700, marginTop: 10 }}>You're checked in!</div>
+            </div>
+            <p className="text-sm mt-2 text-center" style={{ color: C.muted }}>
               {sel.name} · {num(pax)} pax{num(babies) > 0 ? ` (${num(babies)} 👶)` : ""}
               {giftIntent === "yes" && num(amount) > 0 ? ` · gift ${RM(amount)} (${method === "qr" ? "QR" : "cash"})` : ""}
             </p>
@@ -1300,10 +1390,17 @@ function GuestCheckIn({ onBack, theme, locked }) {
             </div>
           </Card>
         ) : !sel ? (
-          <Card>
-            <Field label="Find your invitation — type your name">
-              <input style={inputStyle} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="e.g. Uncle Lim" autoFocus />
-            </Field>
+          <Card style={cardStyle}>
+            <div className="text-center mb-3" style={{ ...serif, fontSize: 20, fontWeight: 600 }}>
+              Find your invitation
+            </div>
+            <input
+              style={{ ...inputStyle, borderRadius: 999, padding: "13px 20px", textAlign: "center", fontSize: 15 }}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Type your name…"
+              autoFocus
+            />
             <div className="grid gap-2 mt-3">
               {matches.map((g) => (
                 <button
@@ -1334,9 +1431,9 @@ function GuestCheckIn({ onBack, theme, locked }) {
             </div>
           </Card>
         ) : (
-          <Card>
+          <Card style={cardStyle}>
             <div className="flex items-center justify-between">
-              <div style={{ ...serif, fontSize: 20, fontWeight: 600 }}>{sel.name}</div>
+              <div style={{ ...serif, fontSize: 24, fontWeight: 700 }}>{sel.name}</div>
               <Btn kind="ghost" small onClick={() => setSel(null)}>
                 Not you?
               </Btn>
@@ -1346,7 +1443,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
             </p>
             {membersOf(sel).length > 0 ? (
               <div className="mt-4">
-                <div className="text-sm font-semibold mb-2">Who's here? Tap names</div>
+                <div className="mb-2" style={sectionLabel}>Who's here? — tap names</div>
                 <div className="flex flex-wrap gap-2">
                   {membersOf(sel).map((m) => {
                     const on = checkedMembers.includes(m.name);
@@ -1400,7 +1497,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
             )}
 
             <div className="mt-4">
-              <div className="text-sm font-semibold mb-2">Would you like to provide the couple with a monetary gift? 💝</div>
+              <div className="mb-2" style={sectionLabel}>Would you like to provide the couple with a monetary gift? 💝</div>
               <div className="flex gap-2">
                 {[["yes", "Yes"], ["no", "No"]].map(([k, label]) => (
                   <button key={k} onClick={() => setGiftIntent(k)} style={choiceBtn(giftIntent === k)}>
@@ -1412,7 +1509,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
 
             {giftIntent === "yes" && (
               <div className="mt-4">
-                <div className="text-sm font-semibold mb-2">How would you like to give?</div>
+                <div className="mb-2" style={sectionLabel}>How would you like to give?</div>
                 <div className="flex gap-2">
                   {[["cash", "💵 Cash"], ["qr", "📱 QR transfer"]].map(([k, label]) => (
                     <button key={k} onClick={() => setMethod(k)} style={choiceBtn(method === k)}>
@@ -1435,9 +1532,31 @@ function GuestCheckIn({ onBack, theme, locked }) {
               </div>
             )}
             <div className="mt-5">
-              <Btn onClick={submit} disabled={busy || !num(pax) || giftIntent === null || (giftIntent === "yes" && (!method || !num(amount)))}>
+              <button
+                onClick={submit}
+                disabled={busy || !num(pax) || giftIntent === null || (giftIntent === "yes" && (!method || !num(amount)))}
+                style={{
+                  width: "100%",
+                  padding: "14px 16px",
+                  borderRadius: 999,
+                  fontSize: 16,
+                  fontWeight: 700,
+                  border: "1px solid transparent",
+                  cursor:
+                    busy || !num(pax) || giftIntent === null || (giftIntent === "yes" && (!method || !num(amount)))
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity:
+                    busy || !num(pax) || giftIntent === null || (giftIntent === "yes" && (!method || !num(amount)))
+                      ? 0.5
+                      : 1,
+                  background: C.gold,
+                  color: C.onGold,
+                  transition: "opacity .15s",
+                }}
+              >
                 {busy ? "Saving…" : "Check in ✓"}
-              </Btn>
+              </button>
             </div>
           </Card>
         )}
@@ -1586,7 +1705,8 @@ function GuestRSVP({ onBack, theme, locked }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ background: C.ivory, color: C.ink, colorScheme: theme }}>
       <GlobalStyle />
-      <div className="w-full max-w-md">
+      <Ornaments />
+      <div className="w-full max-w-md" style={{ position: "relative", zIndex: 1 }}>
         <div className="text-center mb-7">
           <div style={{ color: C.gold, fontSize: 20, letterSpacing: 8 }}>✿&nbsp;❦&nbsp;✿</div>
           <div className="text-xs uppercase mt-3" style={{ color: C.muted, letterSpacing: 5 }}>
