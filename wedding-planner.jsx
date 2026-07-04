@@ -1016,7 +1016,14 @@ function GuestCheckIn({ onBack, theme, locked }) {
   const settings = (data && data.settings) || {};
   const guests = (data && data.guests) || [];
   const q = search.trim().toLowerCase();
-  const matches = q.length >= 2 ? guests.filter((g) => g.name.toLowerCase().includes(q)).slice(0, 8) : [];
+  const matches =
+    q.length >= 2
+      ? guests
+          .filter(
+            (g) => g.name.toLowerCase().includes(q) || membersOf(g).some((m) => m.name.toLowerCase().includes(q))
+          )
+          .slice(0, 8)
+      : [];
 
   const pick = (g) => {
     setSel(g);
@@ -1153,6 +1160,11 @@ function GuestCheckIn({ onBack, theme, locked }) {
                   <span className="text-xs" style={{ color: C.muted }}>
                     {" "}· {g.invitedPax} pax invited{g.group ? ` · ${g.group}` : ""}
                   </span>
+                  {!g.name.toLowerCase().includes(q) && membersOf(g).some((m) => m.name.toLowerCase().includes(q)) && (
+                    <span className="text-xs" style={{ color: C.gold }}>
+                      {" "}· {membersOf(g).find((m) => m.name.toLowerCase().includes(q)).name} is in this party
+                    </span>
+                  )}
                   {g.checkedInAt && (
                     <span className="text-xs" style={{ color: C.green }}> · already checked in ✓</span>
                   )}
@@ -1317,7 +1329,14 @@ function GuestRSVP({ onBack, theme, locked }) {
   const settings = (data && data.settings) || {};
   const guests = (data && data.guests) || [];
   const q = search.trim().toLowerCase();
-  const matches = q.length >= 2 ? guests.filter((g) => g.name.toLowerCase().includes(q)).slice(0, 8) : [];
+  const matches =
+    q.length >= 2
+      ? guests
+          .filter(
+            (g) => g.name.toLowerCase().includes(q) || membersOf(g).some((m) => m.name.toLowerCase().includes(q))
+          )
+          .slice(0, 8)
+      : [];
 
   const dateStr = settings.date
     ? new Date(settings.date).toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
@@ -1433,6 +1452,11 @@ function GuestRSVP({ onBack, theme, locked }) {
                   <span className="text-xs" style={{ color: C.muted }}>
                     {" "}· invited with {g.invitedPax} pax{g.group ? ` · ${g.group}` : ""}
                   </span>
+                  {!g.name.toLowerCase().includes(q) && membersOf(g).some((m) => m.name.toLowerCase().includes(q)) && (
+                    <span className="text-xs" style={{ color: C.gold }}>
+                      {" "}· {membersOf(g).find((m) => m.name.toLowerCase().includes(q)).name} is in this party
+                    </span>
+                  )}
                   {g.rsvp !== "pending" && (
                     <span className="text-xs" style={{ color: g.rsvp === "yes" ? C.green : C.red }}>
                       {" "}· replied: {g.rsvp === "yes" ? "attending" : "declined"} (you can change it)
