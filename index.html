@@ -492,6 +492,84 @@ function Stat({ label, value, sub, tone }) {
   );
 }
 
+// ---------- tiny svg donut chart ----------
+const CHART_COLORS = ["#6B8E7B", "#BC9459", "#8FA8C9", "#B48EAD", "#D9A66C", "#7FA8A0", "#B57373", "#9A8E82"];
+
+function Donut({ slices, size = 150, stroke = 26, centerLabel, centerSub }) {
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  const r = (size - stroke) / 2;
+  const cx = size / 2;
+  const circ = 2 * Math.PI * r;
+  let acc = 0;
+  return (
+    <svg width={size} height={size} style={{ flexShrink: 0 }}>
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke={C.neutral} strokeWidth={stroke} />
+      <g transform={`rotate(-90 ${cx} ${cx})`}>
+        {total > 0 &&
+          slices.map((s, i) => {
+            const dash = (s.value / total) * circ;
+            const off = -acc * circ;
+            acc += s.value / total;
+            return (
+              <circle
+                key={i}
+                cx={cx}
+                cy={cx}
+                r={r}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={stroke}
+                strokeDasharray={`${dash} ${circ - dash}`}
+                strokeDashoffset={off}
+              />
+            );
+          })}
+      </g>
+      <text x={cx} y={cx - 1} textAnchor="middle" style={{ ...serif, fontSize: 22, fontWeight: 700, fill: C.ink }}>
+        {centerLabel !== undefined ? centerLabel : total}
+      </text>
+      <text x={cx} y={cx + 16} textAnchor="middle" style={{ fontSize: 10, fill: C.muted }}>
+        {centerSub || "pax"}
+      </text>
+    </svg>
+  );
+}
+
+function ChartBlock({ title, slices }) {
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  return (
+    <div className="p-3" style={{ background: C.soft, border: `1px solid ${C.line}`, borderRadius: 12 }}>
+      <div className="text-xs uppercase tracking-wider mb-2 text-center" style={{ color: C.muted }}>
+        {title}
+      </div>
+      {total === 0 ? (
+        <div className="text-xs text-center py-6" style={{ color: C.muted }}>
+          No guests here yet.
+        </div>
+      ) : (
+        <>
+          <div className="flex justify-center">
+            <Donut slices={slices.filter((s) => s.value > 0)} />
+          </div>
+          <div className="grid gap-1 mt-3">
+            {slices
+              .filter((s) => s.value > 0)
+              .map((s) => (
+                <div key={s.label} className="flex items-center gap-2 text-xs">
+                  <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, display: "inline-block", flexShrink: 0 }} />
+                  <span style={{ color: C.ink }}>{s.label}</span>
+                  <span className="ml-auto" style={{ color: C.muted, whiteSpace: "nowrap" }}>
+                    {s.value} · {Math.round((s.value / total) * 100)}%
+                  </span>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const GlobalStyle = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Jost:wght@400;500;600&display=swap');
@@ -2589,6 +2667,50 @@ function Overview({ stats, data, setTab, side }) {
           <Stat label="Net cost after gifts" value={RM(stats.net)} tone={stats.net > 0 ? C.ink : C.green} sub={stats.net <= 0 ? "Gifts cover your spend 🎉" : "Spend minus gifts"} />
         </div>
       )}
+      {stats.guestCount > 0 &&
+        (() => {
+          const paxOf = (g) => num(g.invitedPax || 1);
+          const bridePax = data.guests.filter((g) => g.side === "bride").reduce((s, g) => s + paxOf(g), 0);
+          const groomPax = data.guests.filter((g) => g.side === "groom").reduce((s, g) => s + paxOf(g), 0);
+          const groupSlices = (sideKey) => {
+            const map = {};
+            data.guests
+              .filter((g) => g.side === sideKey)
+              .forEach((g) => {
+                const k = (g.group || "").trim() || "Ungrouped";
+                map[k] = (map[k] || 0) + paxOf(g);
+              });
+            const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+            const top = entries.slice(0, 7);
+            const rest = entries.slice(7).reduce((s, [, v]) => s + v, 0);
+            const slices = top.map(([label, value], i) => ({ label, value, color: CHART_COLORS[i % CHART_COLORS.length] }));
+            if (rest > 0) slices.push({ label: "Other", value: rest, color: "#9A8E82" });
+            return slices;
+          };
+          return (
+            <Card>
+              <div style={{ ...serif, fontSize: 20, fontWeight: 600 }}>📊 Guest distribution</div>
+              <p className="text-xs mt-1 mb-3" style={{ color: C.muted }}>
+                Counted in invited pax (babies included). The side charts break each guest list down by group /
+                relation — tune groups with the 🏷️ Groups panel in Guests & RSVP.
+              </p>
+              <div className={side ? "grid gap-4" : "grid md:grid-cols-3 gap-4"}>
+                {!side && (
+                  <ChartBlock
+                    title="Bride vs Groom"
+                    slices={[
+                      { label: "Bride's side", value: bridePax, color: "#BC9459" },
+                      { label: "Groom's side", value: groomPax, color: "#6B8E7B" },
+                    ]}
+                  />
+                )}
+                {(!side || side === "bride") && <ChartBlock title="Bride's side — by group" slices={groupSlices("bride")} />}
+                {(!side || side === "groom") && <ChartBlock title="Groom's side — by group" slices={groupSlices("groom")} />}
+              </div>
+            </Card>
+          );
+        })()}
+
       {stats.guestCount === 0 && (
         <Card>
           <div style={{ ...serif, fontSize: 20, fontWeight: 600 }}>Start {side ? `the ${side}'s` : "your"} guest list</div>
