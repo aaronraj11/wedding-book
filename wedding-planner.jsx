@@ -2445,6 +2445,8 @@ function Guests({ data, up, side }) {
   const [manageGroups, setManageGroups] = useState(false);
   const [groupEdit, setGroupEdit] = useState(null); // group path being changed/deleted
   const [groupTarget, setGroupTarget] = useState("");
+  const [guestMove, setGuestMove] = useState(null); // single guest id being moved to another group
+  const [guestMoveTarget, setGuestMoveTarget] = useState("");
 
   // preset categories plus every group path already in use, for the autocomplete dropdown
   const groupOptions = useMemo(() => {
@@ -2768,9 +2770,54 @@ function Guests({ data, up, side }) {
                       )}
                     </div>
                   </div>
-                  <div className="text-xs mt-1" style={{ color: C.muted }}>
-                    Affected: {list.map((g) => g.name).join(", ")}
+                  <div className="flex flex-wrap items-center gap-1 mt-2">
+                    <span className="text-xs mr-1" style={{ color: C.muted }}>
+                      Affected — tap a name to move just that invite:
+                    </span>
+                    {list.map((g) => (
+                      <button
+                        key={g.id}
+                        onClick={() => {
+                          setGuestMove(guestMove === g.id ? null : g.id);
+                          setGuestMoveTarget("");
+                        }}
+                        style={{
+                          padding: "3px 10px",
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          border: `1px solid ${guestMove === g.id ? C.gold : C.line}`,
+                          background: guestMove === g.id ? C.goldSoft : "transparent",
+                          color: guestMove === g.id ? C.gold : C.muted,
+                        }}
+                      >
+                        {g.name}
+                      </button>
+                    ))}
                   </div>
+                  {list.some((g) => g.id === guestMove) && (
+                    <div className="mt-2 p-3" style={{ background: C.card, border: `1px dashed ${C.gold}`, borderRadius: 8 }}>
+                      <div className="text-xs mb-2" style={{ color: C.muted }}>
+                        Move <b style={{ color: C.ink }}>{(list.find((g) => g.id === guestMove) || {}).name}</b> to:
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div style={{ minWidth: 260, flex: 1 }}>
+                          <GroupSelect value={guestMoveTarget} options={groupOptions.filter((o) => o !== name)} onChange={setGuestMoveTarget} />
+                        </div>
+                        <Btn
+                          small
+                          onClick={() => {
+                            patch(guestMove, { group: guestMoveTarget });
+                            setGuestMove(null);
+                            setGuestMoveTarget("");
+                          }}
+                        >
+                          {guestMoveTarget ? `Move to "${guestMoveTarget}"` : "Remove from group"}
+                        </Btn>
+                      </div>
+                    </div>
+                  )}
                   {groupEdit === name && (
                     <div className="mt-2 p-3" style={{ background: C.card, border: `1px dashed ${C.gold}`, borderRadius: 8 }}>
                       <div className="text-xs mb-2" style={{ color: C.muted }}>
