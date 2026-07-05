@@ -3102,6 +3102,113 @@ function buildSummaryHtml(data) {
 </html>`;
 }
 
+// ---------- printable guest list (per side, for the door / offline backup) ----------
+function buildGuestListHtml(data, side) {
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const guests = (data.guests || []).filter((g) => (side ? g.side === side : true));
+  const title = side === "bride" ? "Bride's Guest List" : side === "groom" ? "Groom's Guest List" : "Guest List";
+  const dateStr = data.settings.date
+    ? new Date(data.settings.date).toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : "";
+
+  const invitedPax = guests.reduce((s, g) => s + num(g.invitedPax || 1), 0);
+  const attending = guests.filter((g) => g.rsvp === "yes");
+  const confirmedPax = attending.reduce((s, g) => s + num(g.confirmedPax || g.invitedPax || 1), 0);
+  const vegTotal = attending.reduce((s, g) => s + vegOf(g), 0);
+
+  const byGroup = {};
+  guests.forEach((g) => {
+    const k = (g.group || "").trim() || "Ungrouped";
+    (byGroup[k] = byGroup[k] || []).push(g);
+  });
+
+  let n = 0;
+  const rows = Object.entries(byGroup)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([group, list]) => {
+      const gPax = list.reduce((s, g) => s + num(g.invitedPax || 1), 0);
+      const head = `<tr class="grp"><td colspan="8">${esc(group)} — ${list.length} invite${list.length === 1 ? "" : "s"} · ${gPax} pax</td></tr>`;
+      const body = list
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((g) => {
+          n++;
+          const mm = membersOf(g);
+          const veg = vegOf(g);
+          const rsvp =
+            g.rsvp === "yes"
+              ? `✔ ${num(g.confirmedPax || g.invitedPax)} pax`
+              : g.rsvp === "no"
+              ? "✗ Declined"
+              : "Pending";
+          const arrived = g.checkedInAt ? `✔ ${num(g.checkedInPax)} pax` : `☐ &nbsp;____`;
+          return `<tr>
+            <td class="r">${n}</td>
+            <td><b>${esc(g.name)}</b>${mm.length ? `<div class="sub">${esc(mm.map((m) => m.name + (m.type === "baby" ? " 👶" : "") + (m.diet === "veg" ? " 🥗" : "")).join(", "))}</div>` : ""}</td>
+            <td>${esc(g.phone || "")}</td>
+            <td class="r">${num(g.invitedPax)}${num(g.invitedBabies) > 0 ? ` <span class="sub">(${num(g.invitedBabies)}👶)</span>` : ""}</td>
+            <td>${rsvp}</td>
+            <td class="r">${veg > 0 ? `${veg} 🥗` : ""}</td>
+            <td class="c">${arrived}</td>
+            <td class="write"></td>
+          </tr>`;
+        })
+        .join("");
+      return head + body;
+    })
+    .join("");
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>${esc(title)} — ${esc(data.settings.couple || "Our Wedding")}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&family=Jost:wght@400;500;600&display=swap');
+  * { box-sizing: border-box; }
+  body { font-family: 'Jost', system-ui, sans-serif; color: #443F3A; background: #fff; margin: 0; padding: 32px 36px; }
+  header { text-align: center; margin-bottom: 18px; }
+  .flourish { color: #BC9459; letter-spacing: 8px; font-size: 15px; }
+  h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 30px; font-weight: 700; margin: 6px 0 2px; }
+  .subtitle { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; color: #BC9459; font-size: 15px; }
+  .totals { text-align: center; font-size: 12px; color: #9A8E82; margin-top: 6px; }
+  .totals b { color: #6B8E7B; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 14px; }
+  th { text-align: left; text-transform: uppercase; letter-spacing: 1px; font-size: 9.5px; color: #9A8E82; border-bottom: 1.5px solid #BC9459; padding: 5px 6px; }
+  td { border-bottom: 1px solid #F0E8DE; padding: 6px; vertical-align: top; }
+  td.r, th.r { text-align: right; }
+  td.c, th.c { text-align: center; white-space: nowrap; }
+  td.write { min-width: 90px; border-bottom: 1px solid #F0E8DE; }
+  .sub { font-size: 10px; color: #9A8E82; }
+  tr.grp td { background: #F6EEDF; font-weight: 600; font-size: 11px; color: #8A6F3C; border-bottom: none; padding: 5px 8px; }
+  tr { page-break-inside: avoid; }
+  footer { margin-top: 24px; text-align: center; color: #B0A698; font-size: 10px; }
+  @media print { body { padding: 8mm 9mm; } .noprint { display: none; } }
+  .noprint { text-align: center; margin-bottom: 14px; }
+  .noprint button { background: #BC9459; color: #fff; border: none; border-radius: 999px; padding: 9px 24px; font-size: 13px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="noprint"><button onclick="window.print()">🖨️ Print / Save as PDF</button></div>
+  <header>
+    <div class="flourish">✿&nbsp;❦&nbsp;✿</div>
+    <h1>${esc(data.settings.couple || "Our Wedding")}</h1>
+    <div class="subtitle">${esc(title)}${dateStr ? ` · ${esc(dateStr)}` : ""}</div>
+    <div class="totals">
+      <b>${guests.length}</b> invites · <b>${invitedPax}</b> pax invited · <b>${confirmedPax}</b> pax confirmed${vegTotal > 0 ? ` · <b>${vegTotal}</b> vegetarian` : ""}
+    </div>
+  </header>
+  <table>
+    <thead>
+      <tr><th class="r">#</th><th>Invite / members</th><th>Phone</th><th class="r">Invited</th><th>RSVP</th><th class="r">Veg</th><th class="c">Arrived</th><th>Notes / gift</th></tr>
+    </thead>
+    <tbody>${rows || `<tr><td colspan="8">No guests on this side yet.</td></tr>`}</tbody>
+  </table>
+  <footer>Printed ${new Date().toLocaleString("en-MY", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })} · Wedding Book 💍</footer>
+</body>
+</html>`;
+}
+
 // ---------- data: backup, excel export, guest import ----------
 function downloadBlob(content, filename, type) {
   const blob = content instanceof Blob ? content : new Blob([content], { type });
@@ -3135,6 +3242,14 @@ function DataPanel({ data, up }) {
     const w = window.open("", "_blank");
     if (!w) return setMsg("Your browser blocked the report window — allow pop-ups for this site and try again.");
     w.document.write(buildSummaryHtml(data));
+    w.document.close();
+  };
+
+  // ---- printable guest list per side (paper backup for the door) ----
+  const openGuestList = (side) => {
+    const w = window.open("", "_blank");
+    if (!w) return setMsg("Your browser blocked the report window — allow pop-ups for this site and try again.");
+    w.document.write(buildGuestListHtml(data, side));
     w.document.close();
   };
 
@@ -3362,10 +3477,17 @@ function DataPanel({ data, up }) {
             <Btn kind="gold" onClick={openSummary}>📄 Wedding summary (PDF)</Btn>
             <Btn kind="ghost" onClick={exportBackup}>Full backup (.json)</Btn>
           </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Btn kind="ghost" onClick={() => openGuestList("bride")}>🖨️ Bride's guest list</Btn>
+            <Btn kind="ghost" onClick={() => openGuestList("groom")}>🖨️ Groom's guest list</Btn>
+            <Btn kind="ghost" onClick={() => openGuestList(null)}>🖨️ Full guest list</Btn>
+          </div>
           <p className="text-xs mt-3" style={{ color: C.muted }}>
             The Excel file has separate sheets for Guests (with RSVP + gifts), Budget, Other Gifts, Caterers and
-            To-dos. The wedding summary opens a beautiful print-ready report — pick “Save as PDF” in the print dialog.
-            The .json backup is for restoring into this app.
+            To-dos. The wedding summary and guest lists open print-ready — pick “Save as PDF” in the print dialog.
+            Print the guest lists before the big day as a paper backup for the door: they include members, phone,
+            RSVP, veg counts, and blank Arrived/Notes columns to fill in by pen. The .json backup is for restoring
+            into this app.
           </p>
         </Card>
 
