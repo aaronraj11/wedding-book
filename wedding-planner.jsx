@@ -2442,6 +2442,9 @@ function Guests({ data, up, side }) {
   const [view, setView] = useState("list");
   const [editId, setEditId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // guest id awaiting delete confirmation
+  const [manageGroups, setManageGroups] = useState(false);
+  const [groupEdit, setGroupEdit] = useState(null); // group path being changed/deleted
+  const [groupTarget, setGroupTarget] = useState("");
 
   // preset categories plus every group path already in use, for the autocomplete dropdown
   const groupOptions = useMemo(() => {
@@ -2454,6 +2457,23 @@ function Guests({ data, up, side }) {
   }, [data.guests]);
 
   const dupName = form.name.trim() !== "" && data.guests.some((g) => g.name.trim().toLowerCase() === form.name.trim().toLowerCase());
+
+  // every exact group path in use, with the guests inside it
+  const groupsInUse = useMemo(() => {
+    const map = {};
+    data.guests.forEach((g) => {
+      const k = (g.group || "").trim();
+      if (!k) return;
+      (map[k] = map[k] || []).push(g);
+    });
+    return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [data.guests]);
+
+  const reassignGroup = (from, to) => {
+    up({ guests: data.guests.map((g) => (((g.group || "").trim() === from) ? { ...g, group: to } : g)) });
+    setGroupEdit(null);
+    setGroupTarget("");
+  };
   const formMembers = form.members.map(asMember).filter((m) => m.name.trim());
   const formBabies = babyCount(formMembers);
 
@@ -2675,6 +2695,21 @@ function Guests({ data, up, side }) {
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setManageGroups((v) => !v)}
+          style={{
+            padding: "5px 12px",
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 600,
+            border: `1px solid ${manageGroups ? C.green : C.line}`,
+            background: manageGroups ? C.greenSoft : C.card,
+            color: manageGroups ? C.green : C.muted,
+            cursor: "pointer",
+          }}
+        >
+          🏷️ Groups
+        </button>
         {filters.map(([k, label]) => (
           <button
             key={k}
@@ -2695,6 +2730,73 @@ function Guests({ data, up, side }) {
         ))}
         <input style={{ ...inputStyle, width: 200, marginLeft: "auto" }} placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
+
+      {manageGroups && (
+        <Card>
+          <div style={{ ...serif, fontSize: 18, fontWeight: 600 }} className="mb-2">
+            🏷️ Groups in use
+          </div>
+          {groupsInUse.length === 0 ? (
+            <span className="text-sm" style={{ color: C.muted }}>
+              No groups assigned yet.
+            </span>
+          ) : (
+            <div className="grid gap-2">
+              {groupsInUse.map(([name, list]) => (
+                <div key={name} className="p-2" style={{ background: C.soft, border: `1px solid ${C.line}`, borderRadius: 8 }}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold">{name}</span>
+                    <Pill>
+                      {list.length} invite{list.length === 1 ? "" : "s"} · {list.reduce((s, g) => s + num(g.invitedPax || 1), 0)} pax
+                    </Pill>
+                    <div className="ml-auto">
+                      {groupEdit === name ? (
+                        <Btn kind="ghost" small onClick={() => setGroupEdit(null)}>
+                          Cancel
+                        </Btn>
+                      ) : (
+                        <Btn
+                          kind="ghost"
+                          small
+                          onClick={() => {
+                            setGroupEdit(name);
+                            setGroupTarget("");
+                          }}
+                        >
+                          Change / delete…
+                        </Btn>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: C.muted }}>
+                    Affected: {list.map((g) => g.name).join(", ")}
+                  </div>
+                  {groupEdit === name && (
+                    <div className="mt-2 p-3" style={{ background: C.card, border: `1px dashed ${C.gold}`, borderRadius: 8 }}>
+                      <div className="text-xs mb-2" style={{ color: C.muted }}>
+                        Move these {list.length} invite{list.length === 1 ? "" : "s"} to another group — or to none — and
+                        "{name}" disappears from the list:
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div style={{ minWidth: 260, flex: 1 }}>
+                          <GroupSelect value={groupTarget} options={groupOptions.filter((o) => o !== name)} onChange={setGroupTarget} />
+                        </div>
+                        <Btn small onClick={() => reassignGroup(name, groupTarget)}>
+                          {groupTarget ? `Move to "${groupTarget}"` : "Remove group (ungrouped)"}
+                        </Btn>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs mt-2" style={{ color: C.muted }}>
+            Nested paths are separate entries — changing "Friends" doesn't touch "Friends / Mom's friends". Guests keep
+            everything else (RSVP, members, gifts); only their group label changes.
+          </p>
+        </Card>
+      )}
 
       {shown.length === 0 && (
         <Card>
