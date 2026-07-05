@@ -2409,6 +2409,7 @@ function Guests({ data, up, side }) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState("list");
   const [editId, setEditId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // guest id awaiting delete confirmation
 
   // preset categories plus every group path already in use, for the autocomplete dropdown
   const groupOptions = useMemo(() => {
@@ -2715,11 +2716,35 @@ function Guests({ data, up, side }) {
               <Btn kind="ghost" small onClick={() => setEditId(editId === g.id ? null : g.id)}>
                 {editId === g.id ? "Done" : "✏️ Edit"}
               </Btn>
-              <Btn kind="danger" small onClick={() => remove(g.id)}>
+              <Btn kind="danger" small onClick={() => setConfirmDelete(confirmDelete === g.id ? null : g.id)}>
                 ✕
               </Btn>
             </div>
           </div>
+          {confirmDelete === g.id && (
+            <div className="p-3 mt-2" style={{ background: C.redSoft, border: `1px solid ${C.red}`, borderRadius: 10 }}>
+              <div className="text-sm font-semibold" style={{ color: C.red }}>
+                Delete "{g.name}"?
+              </div>
+              <div className="text-xs mt-1" style={{ color: C.muted }}>
+                This removes their RSVP, check-in and gift records for everyone on the team. It cannot be undone.
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Btn
+                  small
+                  onClick={() => {
+                    remove(g.id);
+                    setConfirmDelete(null);
+                  }}
+                >
+                  Yes, delete guest
+                </Btn>
+                <Btn kind="ghost" small onClick={() => setConfirmDelete(null)}>
+                  Cancel
+                </Btn>
+              </div>
+            </div>
+          )}
           {membersOf(g).length > 0 && (
             <div className="flex flex-wrap items-center gap-1 mt-2">
               <span className="text-xs mr-1" style={{ color: C.muted }}>
