@@ -3909,19 +3909,43 @@ function DataPanel({ data, up }) {
           from. The tools below give you a physical copy: backups you can keep, an Excel file you can print or send to
           your venue, and a quick way to import a guest list you already have.
         </p>
-        <div className="text-sm mt-3 grid gap-1" style={{ wordBreak: "break-all" }}>
-          <div>
-            <span style={{ color: C.muted }}>👥 Team link (opens your wedding's sign-in): </span>
-            <b style={{ color: C.ink }}>{`${location.origin}${location.pathname}?w=${WEDDING}`}</b>
-          </div>
-          <div>
-            <span style={{ color: C.muted }}>💌 RSVP link for guests (locked — they see only the RSVP page): </span>
-            <b style={{ color: C.ink }}>{`${location.origin}${location.pathname}?w=${WEDDING}&p=rsvp`}</b>
-          </div>
-          <div>
-            <span style={{ color: C.muted }}>🎟️ Check-in link for the door (locked — kiosk mode for a tablet/laptop): </span>
-            <b style={{ color: C.ink }}>{`${location.origin}${location.pathname}?w=${WEDDING}&p=checkin`}</b>
-          </div>
+        <div className="text-sm mt-3 grid gap-2" style={{ wordBreak: "break-all" }}>
+          {[
+            ["👥 Team link (opens your wedding's sign-in):", `${location.origin}${location.pathname}?w=${WEDDING}`],
+            ["💌 RSVP link for guests (locked — they see only the RSVP page):", `${location.origin}${location.pathname}?w=${WEDDING}&p=rsvp`],
+            ["🎟️ Check-in link for the door (locked — kiosk mode for a tablet/laptop):", `${location.origin}${location.pathname}?w=${WEDDING}&p=checkin`],
+          ].map(([label, url]) => (
+            <div key={url} className="flex flex-wrap items-center gap-2">
+              <span style={{ color: C.muted }}>{label}</span>
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: C.green, fontWeight: 600, textDecoration: "underline" }}
+              >
+                {url}
+              </a>
+              <button
+                onClick={(e) => {
+                  navigator.clipboard && navigator.clipboard.writeText(url);
+                  e.target.textContent = "✓ Copied";
+                  setTimeout(() => (e.target.textContent = "Copy"), 1500);
+                }}
+                style={{
+                  padding: "2px 10px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  border: `1px solid ${C.line}`,
+                  background: C.card,
+                  color: C.muted,
+                }}
+              >
+                Copy
+              </button>
+            </div>
+          ))}
         </div>
       </Card>
 
