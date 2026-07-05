@@ -112,6 +112,32 @@ const vegOf = (g) => {
   return num(g.confirmedVeg);
 };
 
+// cross-check naming clashes that can confuse RSVP/check-in search or member ticking
+function findNameClashes(guests) {
+  const inviteSeen = {};
+  const inviteDupes = new Set();
+  guests.forEach((g) => {
+    const k = g.name.trim().toLowerCase();
+    if (inviteSeen[k]) inviteDupes.add(g.name.trim());
+    inviteSeen[k] = true;
+  });
+  const withinDupes = []; // same member name twice inside one invite
+  const memberMap = {}; // member name -> which invites it appears in
+  guests.forEach((g) => {
+    const seen = {};
+    membersOf(g).forEach((m) => {
+      const k = m.name.trim().toLowerCase();
+      if (seen[k]) withinDupes.push({ invite: g.name, name: m.name });
+      seen[k] = true;
+      (memberMap[k] = memberMap[k] || { name: m.name, invites: new Set() }).invites.add(g.name);
+    });
+  });
+  const acrossDupes = Object.values(memberMap)
+    .filter((x) => x.invites.size > 1)
+    .map((x) => ({ name: x.name, invites: [...x.invites] }));
+  return { inviteDupes: [...inviteDupes], withinDupes, acrossDupes };
+}
+
 const GROUP_PRESETS = [
   "Immediate family",
   "Immediate family / Mom's side",
@@ -2594,6 +2620,38 @@ function Guests({ data, up, side }) {
 
       <InvitePanel data={data} up={up} pool={pool} />
 
+      {(() => {
+        const cl = findNameClashes(pool);
+        if (!cl.inviteDupes.length && !cl.withinDupes.length && !cl.acrossDupes.length) return null;
+        return (
+          <Card style={{ borderColor: C.gold }}>
+            <div style={{ ...serif, fontSize: 18, fontWeight: 600 }}>⚠️ Duplicate name check</div>
+            {cl.inviteDupes.length > 0 && (
+              <p className="text-sm mt-2">
+                <b style={{ color: C.red }}>Two invites share the same name:</b> {cl.inviteDupes.join(", ")}. Guests
+                searching at RSVP/check-in may pick the wrong one — rename one of them (✏️ Edit), e.g. add the branch:
+                "Uncle Lim — Dad's side".
+              </p>
+            )}
+            {cl.withinDupes.length > 0 && (
+              <p className="text-sm mt-2">
+                <b style={{ color: C.red }}>Same name twice inside one family:</b>{" "}
+                {cl.withinDupes.map((d) => `${d.name} (in ${d.invite})`).join(", ")}. Name-ticking at RSVP and check-in
+                can't tell them apart — make each member unique, e.g. "Adam" and "Adam Jr".
+              </p>
+            )}
+            {cl.acrossDupes.length > 0 && (
+              <p className="text-sm mt-2" style={{ color: C.muted }}>
+                <b style={{ color: C.gold }}>Same member name in different invites:</b>{" "}
+                {cl.acrossDupes.map((d) => `${d.name} (${d.invites.join(" & ")})`).join("; ")}. This works — the search
+                shows which family each result belongs to — but if they're different people, adding a surname avoids
+                mix-ups at the door.
+              </p>
+            )}
+          </Card>
+        );
+      })()}
+
       <div className="flex gap-2 flex-wrap items-center">
         <div className="flex" style={{ border: `1px solid ${C.line}`, borderRadius: 999, overflow: "hidden" }}>
           {[
@@ -2794,6 +2852,11 @@ function Guests({ data, up, side }) {
             <div className="flex flex-wrap gap-3 mt-3 items-end p-3" style={{ background: C.soft, border: `1px dashed ${C.gold}`, borderRadius: 8 }}>
               <Field label="Name">
                 <input style={{ ...inputStyle, width: 200 }} value={g.name} onChange={(e) => patch(g.id, { name: e.target.value })} />
+                {data.guests.some((x) => x.id !== g.id && x.name.trim().toLowerCase() === g.name.trim().toLowerCase()) && (
+                  <span className="text-xs" style={{ color: C.red }}>
+                    Another invite already has this name
+                  </span>
+                )}
               </Field>
               {!side && (
                 <Field label="Side">
