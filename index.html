@@ -3114,7 +3114,6 @@ function buildGuestListHtml(data, side) {
   const invitedPax = guests.reduce((s, g) => s + num(g.invitedPax || 1), 0);
   const attending = guests.filter((g) => g.rsvp === "yes");
   const confirmedPax = attending.reduce((s, g) => s + num(g.confirmedPax || g.invitedPax || 1), 0);
-  const vegTotal = attending.reduce((s, g) => s + vegOf(g), 0);
 
   const byGroup = {};
   guests.forEach((g) => {
@@ -3134,23 +3133,21 @@ function buildGuestListHtml(data, side) {
         .map((g) => {
           n++;
           const mm = membersOf(g);
-          const veg = vegOf(g);
           const rsvp =
             g.rsvp === "yes"
               ? `✔ ${num(g.confirmedPax || g.invitedPax)} pax`
               : g.rsvp === "no"
               ? "✗ Declined"
               : "Pending";
-          const arrived = g.checkedInAt ? `✔ ${num(g.checkedInPax)} pax` : `☐ &nbsp;____`;
           return `<tr>
             <td class="r">${n}</td>
-            <td><b>${esc(g.name)}</b>${mm.length ? `<div class="sub">${esc(mm.map((m) => m.name + (m.type === "baby" ? " 👶" : "") + (m.diet === "veg" ? " 🥗" : "")).join(", "))}</div>` : ""}</td>
+            <td><b>${esc(g.name)}</b>${mm.length ? `<div class="sub">${esc(mm.map((m) => m.name + (m.type === "baby" ? " 👶" : "")).join(", "))}</div>` : ""}</td>
             <td>${esc(g.phone || "")}</td>
             <td class="r">${num(g.invitedPax)}${num(g.invitedBabies) > 0 ? ` <span class="sub">(${num(g.invitedBabies)}👶)</span>` : ""}</td>
             <td>${rsvp}</td>
-            <td class="r">${veg > 0 ? `${veg} 🥗` : ""}</td>
-            <td class="c">${arrived}</td>
-            <td class="write"></td>
+            <td class="c">${g.checkedInAt ? "✔" : `<span class="tick">☐</span>`}</td>
+            <td class="c">${g.checkedInAt ? `${num(g.checkedInPax)} pax` : `<div class="wbox"></div>`}</td>
+            <td><div class="wbox wide"></div></td>
           </tr>`;
         })
         .join("");
@@ -3178,7 +3175,9 @@ function buildGuestListHtml(data, side) {
   td { border-bottom: 1px solid #F0E8DE; padding: 6px; vertical-align: top; }
   td.r, th.r { text-align: right; }
   td.c, th.c { text-align: center; white-space: nowrap; }
-  td.write { min-width: 90px; border-bottom: 1px solid #F0E8DE; }
+  .tick { font-size: 15px; color: #9A8E82; }
+  .wbox { height: 20px; min-width: 52px; border: 1px solid #E2D7C8; border-radius: 4px; background: #FDFBF8; }
+  .wbox.wide { min-width: 110px; }
   .sub { font-size: 10px; color: #9A8E82; }
   tr.grp td { background: #F6EEDF; font-weight: 600; font-size: 11px; color: #8A6F3C; border-bottom: none; padding: 5px 8px; }
   tr { page-break-inside: avoid; }
@@ -3195,12 +3194,12 @@ function buildGuestListHtml(data, side) {
     <h1>${esc(data.settings.couple || "Our Wedding")}</h1>
     <div class="subtitle">${esc(title)}${dateStr ? ` · ${esc(dateStr)}` : ""}</div>
     <div class="totals">
-      <b>${guests.length}</b> invites · <b>${invitedPax}</b> pax invited · <b>${confirmedPax}</b> pax confirmed${vegTotal > 0 ? ` · <b>${vegTotal}</b> vegetarian` : ""}
+      <b>${guests.length}</b> invites · <b>${invitedPax}</b> pax invited · <b>${confirmedPax}</b> pax confirmed
     </div>
   </header>
   <table>
     <thead>
-      <tr><th class="r">#</th><th>Invite / members</th><th>Phone</th><th class="r">Invited</th><th>RSVP</th><th class="r">Veg</th><th class="c">Arrived</th><th>Notes / gift</th></tr>
+      <tr><th class="r">#</th><th>Invite / members</th><th>Phone</th><th class="r">Invited</th><th>RSVP</th><th class="c">Arrived ✓</th><th class="c">Pax arrived</th><th>Notes / gift</th></tr>
     </thead>
     <tbody>${rows || `<tr><td colspan="8">No guests on this side yet.</td></tr>`}</tbody>
   </table>
