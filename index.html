@@ -2914,6 +2914,11 @@ function Guests({ data, up, side }) {
               <Field label="Phone">
                 <input style={{ ...inputStyle, width: 150 }} value={g.phone || ""} onChange={(e) => patch(g.id, { phone: e.target.value })} />
               </Field>
+              <div className="pb-1">
+                <Btn kind="ghost" small onClick={() => patch(g.id, { invitedAt: g.invitedAt ? null : Date.now() })}>
+                  {g.invitedAt ? "📨 Clear “invited” status" : "📨 Mark as invited"}
+                </Btn>
+              </div>
               <div className="w-full">
                 <div className="text-xs uppercase tracking-wider mb-2" style={{ color: C.muted }}>
                   Family members (adult or baby 👶 — pax follows these boxes)
