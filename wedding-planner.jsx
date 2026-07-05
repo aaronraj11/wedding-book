@@ -1122,6 +1122,7 @@ function GuestCheckIn({ onBack, theme, locked }) {
   const [pax, setPax] = useState("");
   const [babies, setBabies] = useState("");
   const [checkedMembers, setCheckedMembers] = useState([]);
+  const [side, setSide] = useState(null); // "bride" | "groom" — asked first to narrow the search
   const [giftIntent, setGiftIntent] = useState(null); // null | "yes" | "no"
   const [method, setMethod] = useState(null); // "cash" | "qr"
   const [amount, setAmount] = useState("");
@@ -1147,7 +1148,9 @@ function GuestCheckIn({ onBack, theme, locked }) {
     q.length >= 2
       ? guests
           .filter(
-            (g) => g.name.toLowerCase().includes(q) || membersOf(g).some((m) => m.name.toLowerCase().includes(q))
+            (g) =>
+              (!side || g.side === side) &&
+              (g.name.toLowerCase().includes(q) || membersOf(g).some((m) => m.name.toLowerCase().includes(q)))
           )
           .slice(0, 8)
       : [];
@@ -1225,15 +1228,18 @@ function GuestCheckIn({ onBack, theme, locked }) {
     setBusy(false);
   };
 
-  const qrBlock = settings.qrImage ? (
+  // each side has their own QR; the shared one from before acts as a fallback
+  const sideQr = side === "groom" ? settings.qrImageGroom || settings.qrImage : settings.qrImageBride || settings.qrImage;
+  const qrBlock = sideQr ? (
     <div className="text-center mt-3">
       <img
-        src={settings.qrImage}
+        src={sideQr}
         alt="Payment QR"
         style={{ maxWidth: 260, width: "100%", borderRadius: 12, border: `1px solid ${C.line}`, margin: "0 auto", background: "#fff", padding: 8 }}
       />
       <p className="text-xs mt-2" style={{ color: C.muted }}>
-        Scan with your banking app to transfer{num(amount) > 0 ? ` ${RM(amount)}` : ""}. Thank you! 💛
+        Scan with your banking app to transfer{num(amount) > 0 ? ` ${RM(amount)}` : ""} to the{" "}
+        {side === "groom" ? "groom" : "bride"}. Thank you! 💛
       </p>
     </div>
   ) : (
@@ -1304,11 +1310,55 @@ function GuestCheckIn({ onBack, theme, locked }) {
                   setMethod(null);
                   setAmount("");
                   setErr("");
+                  setSide(null);
                 }}
               >
                 ✓ Done
               </Btn>
             </div>
+          </Card>
+        ) : !side ? (
+          <Card style={cardStyle}>
+            <div className="text-center mb-4" style={{ ...serif, fontSize: 20, fontWeight: 600 }}>
+              Whose guest are you?
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setSide("bride")}
+                style={{
+                  flex: 1,
+                  padding: "18px 10px",
+                  borderRadius: 14,
+                  fontSize: 16,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  border: `1.5px solid ${C.gold}`,
+                  background: C.goldSoft,
+                  color: C.gold,
+                }}
+              >
+                🌸 Bride's guest
+              </button>
+              <button
+                onClick={() => setSide("groom")}
+                style={{
+                  flex: 1,
+                  padding: "18px 10px",
+                  borderRadius: 14,
+                  fontSize: 16,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  border: `1.5px solid ${C.green}`,
+                  background: C.greenSoft,
+                  color: C.green,
+                }}
+              >
+                🤵 Groom's guest
+              </button>
+            </div>
+            <p className="text-xs text-center mt-3" style={{ color: C.muted }}>
+              Not sure? Pick the side that invited you — the ushers can help.
+            </p>
           </Card>
         ) : !sel ? (
           <Card style={cardStyle}>
@@ -1346,10 +1396,22 @@ function GuestCheckIn({ onBack, theme, locked }) {
               ))}
               {q.length >= 2 && matches.length === 0 && (
                 <span className="text-sm" style={{ color: C.muted }}>
-                  No invitation found under that name — please check with the ushers.
+                  No invitation found under that name on this side — try switching side below, or ask the ushers.
                 </span>
               )}
             </div>
+            <p className="text-xs text-center mt-3" style={{ color: C.muted }}>
+              Searching {side === "bride" ? "the bride's" : "the groom's"} guests ·{" "}
+              <button
+                onClick={() => {
+                  setSide(null);
+                  setSearch("");
+                }}
+                style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", textDecoration: "underline", fontSize: 12, padding: 0 }}
+              >
+                switch side
+              </button>
+            </p>
           </Card>
         ) : (
           <Card style={cardStyle}>
@@ -3550,8 +3612,9 @@ function DataPanel({ data, up }) {
     }
   };
 
-  // ---- gift QR image (shown to guests at check-in) ----
-  const importQr = (file) => {
+  // ---- gift QR images, one per side (shown to guests at check-in) ----
+  const qrTargetRef = useRef("qrImageBride");
+  const importQr = (file, key) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
@@ -3565,8 +3628,8 @@ function DataPanel({ data, up }) {
       let dataUrl = canvas.toDataURL("image/png");
       if (dataUrl.length > 300000) dataUrl = canvas.toDataURL("image/jpeg", 0.85);
       if (dataUrl.length > 400000) return setMsg("That image is too heavy — please crop it to just the QR code and try again.");
-      up({ settings: { ...data.settings, qrImage: dataUrl } });
-      setMsg("QR image saved — guests who pick “QR transfer” at check-in will now see it.");
+      up({ settings: { ...data.settings, [key]: dataUrl } });
+      setMsg(`${key === "qrImageBride" ? "Bride's" : "Groom's"} QR saved — guests checking in under ${key === "qrImageBride" ? "the bride" : "the groom"} will see it.`);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -3693,38 +3756,72 @@ function DataPanel({ data, up }) {
       </Card>
 
       <Card>
-        <div style={{ ...serif, fontSize: 18, fontWeight: 600 }}>📱 Gift QR code</div>
+        <div style={{ ...serif, fontSize: 18, fontWeight: 600 }}>📱 Gift QR codes</div>
         <p className="text-xs mt-1 mb-3" style={{ color: C.muted }}>
-          Upload your DuitNow / bank transfer QR image. Guests who choose “QR transfer” at check-in will see it and
-          can scan it with their banking app to send their gift.
+          Each side uploads their own DuitNow / bank QR. At check-in, guests first pick whose guest they are — the
+          bride's guests see her QR, the groom's guests see his.
         </p>
-        {data.settings.qrImage && (
-          <img
-            src={data.settings.qrImage}
-            alt="Gift QR"
-            style={{ maxWidth: 180, borderRadius: 10, border: `1px solid ${C.line}`, background: "#fff", padding: 6 }}
-          />
-        )}
         <input
           ref={qrFileRef}
           type="file"
           accept="image/*"
           style={{ display: "none" }}
           onChange={(e) => {
-            if (e.target.files && e.target.files[0]) importQr(e.target.files[0]);
+            if (e.target.files && e.target.files[0]) importQr(e.target.files[0], qrTargetRef.current);
             e.target.value = "";
           }}
         />
-        <div className="flex gap-2 mt-3">
-          <Btn onClick={() => qrFileRef.current && qrFileRef.current.click()}>
-            {data.settings.qrImage ? "Replace image…" : "Upload QR image…"}
-          </Btn>
-          {data.settings.qrImage && (
-            <Btn kind="danger" onClick={() => up({ settings: { ...data.settings, qrImage: "" } })}>
-              Remove
-            </Btn>
-          )}
+        <div className="grid md:grid-cols-2 gap-4">
+          {[["qrImageBride", "🌸 Bride's QR"], ["qrImageGroom", "🤵 Groom's QR"]].map(([key, label]) => (
+            <div key={key} className="p-3" style={{ background: C.soft, border: `1px solid ${C.line}`, borderRadius: 10 }}>
+              <div className="text-sm font-semibold mb-2">{label}</div>
+              {data.settings[key] ? (
+                <img
+                  src={data.settings[key]}
+                  alt={label}
+                  style={{ maxWidth: 160, borderRadius: 10, border: `1px solid ${C.line}`, background: "#fff", padding: 6 }}
+                />
+              ) : data.settings.qrImage ? (
+                <p className="text-xs" style={{ color: C.muted }}>
+                  Currently using the shared QR uploaded earlier — upload one here to replace it for this side.
+                </p>
+              ) : (
+                <p className="text-xs" style={{ color: C.muted }}>Not uploaded yet.</p>
+              )}
+              <div className="flex gap-2 mt-2">
+                <Btn
+                  small
+                  onClick={() => {
+                    qrTargetRef.current = key;
+                    if (qrFileRef.current) qrFileRef.current.click();
+                  }}
+                >
+                  {data.settings[key] ? "Replace…" : "Upload…"}
+                </Btn>
+                {data.settings[key] && (
+                  <Btn kind="danger" small onClick={() => up({ settings: { ...data.settings, [key]: "" } })}>
+                    Remove
+                  </Btn>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
+        {data.settings.qrImage && (
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <span className="text-xs" style={{ color: C.muted }}>
+              Shared fallback QR (from before) — used wherever a side hasn't uploaded its own:
+            </span>
+            <img
+              src={data.settings.qrImage}
+              alt="Shared QR"
+              style={{ maxWidth: 70, borderRadius: 6, border: `1px solid ${C.line}`, background: "#fff", padding: 3 }}
+            />
+            <Btn kind="danger" small onClick={() => up({ settings: { ...data.settings, qrImage: "" } })}>
+              Remove shared QR
+            </Btn>
+          </div>
+        )}
       </Card>
 
       {msg && (
