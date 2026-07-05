@@ -3914,6 +3914,15 @@ function FamilyTree({ pool, side, coupleName }) {
         >
           💍 {coupleName || "The Couple"}
         </span>
+        {(() => {
+          const t = branchStats(pool);
+          return (
+            <div className="text-sm mt-3" style={{ color: C.muted }}>
+              Combined total: <b style={{ color: C.green }}>{t.pax} pax</b> · {t.invites} invites
+              {t.babies > 0 ? ` · ${t.babies} 👶` : ""} · {t.attending} attending
+            </div>
+          );
+        })()}
       </div>
 
       <div className={sides.length === 2 ? "grid md:grid-cols-2 gap-4" : "grid gap-4"}>
