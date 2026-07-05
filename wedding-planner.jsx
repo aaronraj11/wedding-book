@@ -2853,10 +2853,9 @@ function Guests({ data, up, side }) {
 
       {view === "tree" && shown.length > 0 && <FamilyTree pool={shown} side={side} coupleName={data.settings.couple} />}
 
-      {view === "list" && (
-        <div className="grid gap-2">
-          {shown.map((g) => (
-        <Card key={g.id} style={{ padding: 10 }}>
+      {view === "list" &&
+        shown.map((g) => (
+        <Card key={g.id} style={{ padding: 14 }}>
           <div className="flex flex-wrap items-center gap-2">
             <div className="font-semibold text-base mr-1">{g.name}</div>
             <Pill tone={g.side === "bride" ? "gold" : "green"}>{g.side === "bride" ? "Bride" : "Groom"}</Pill>
@@ -2892,7 +2891,7 @@ function Guests({ data, up, side }) {
                   }}
                   title={g.invitedAt ? "Send again on WhatsApp" : "Send invitation on WhatsApp"}
                   style={{
-                    padding: "3px 9px",
+                    padding: "4px 10px",
                     borderRadius: 999,
                     fontSize: 12,
                     fontWeight: 600,
@@ -2914,7 +2913,7 @@ function Guests({ data, up, side }) {
                   key={k}
                   onClick={() => patch(g.id, { rsvp: k, confirmedPax: k === "yes" ? g.confirmedPax || g.invitedPax : "" })}
                   style={{
-                    padding: "3px 9px",
+                    padding: "4px 10px",
                     borderRadius: 999,
                     fontSize: 12,
                     fontWeight: 600,
@@ -2959,48 +2958,45 @@ function Guests({ data, up, side }) {
               </div>
             </div>
           )}
-          {membersOf(g).length > 0 &&
-            (g.rsvp === "yes" ? (
-              <div className="flex flex-wrap items-center gap-1 mt-2">
-                <span className="text-xs mr-1" style={{ color: C.muted }}>
-                  👨‍👩‍👧
-                </span>
-                {membersOf(g).map((m) => {
-                  const known = Array.isArray(g.confirmedMembers);
-                  const coming = known ? g.confirmedMembers.includes(m.name) : null;
-                  return (
-                    <button
-                      key={m.name}
-                      onClick={() => toggleMember(g, m.name)}
-                      title="Tap to toggle whether this person is coming"
-                      style={{
-                        padding: "2px 9px",
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        border: `1px solid ${coming === true ? C.green : C.line}`,
-                        background: coming === true ? C.greenSoft : "transparent",
-                        color: coming === true ? C.green : C.muted,
-                        textDecoration: coming === false ? "line-through" : "none",
-                      }}
-                    >
-                      {coming === true ? "✓ " : ""}
-                      {m.name}
-                      {m.type === "baby" ? " 👶" : ""}
-                      {m.diet === "veg" ? " 🥗" : ""}
-                    </button>
-                  );
-                })}
+          {membersOf(g).length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mt-2">
+              <span className="text-xs mr-1" style={{ color: C.muted }}>
+                👨‍👩‍👧
+              </span>
+              {membersOf(g).map((m) => {
+                const known = g.rsvp === "yes" && Array.isArray(g.confirmedMembers);
+                const coming = known ? g.confirmedMembers.includes(m.name) : null;
+                return (
+                  <button
+                    key={m.name}
+                    onClick={() => g.rsvp === "yes" && toggleMember(g, m.name)}
+                    title={g.rsvp === "yes" ? "Tap to toggle whether this person is coming" : "Set RSVP to Attending to tick people off"}
+                    style={{
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: g.rsvp === "yes" ? "pointer" : "default",
+                      border: `1px solid ${coming === true ? C.green : C.line}`,
+                      background: coming === true ? C.greenSoft : "transparent",
+                      color: coming === true ? C.green : C.muted,
+                      textDecoration: coming === false ? "line-through" : "none",
+                    }}
+                  >
+                    {coming === true ? "✓ " : ""}
+                    {m.name}
+                    {m.type === "baby" ? " 👶" : ""}
+                    {m.diet === "veg" ? " 🥗" : ""}
+                  </button>
+                );
+              })}
+              {g.rsvp === "yes" && (
                 <span className="text-xs ml-1" style={{ color: C.muted }}>
                   tap names to mark who's coming
                 </span>
-              </div>
-            ) : (
-              <div className="text-xs mt-1" style={{ color: C.muted }}>
-                👨‍👩‍👧 {membersOf(g).map((m) => m.name + (m.type === "baby" ? " 👶" : "")).join(" · ")}
-              </div>
-            ))}
+              )}
+            </div>
+          )}
           {editId === g.id && (
             <div className="flex flex-wrap gap-3 mt-3 items-end p-3" style={{ background: C.soft, border: `1px dashed ${C.gold}`, borderRadius: 8 }}>
               <Field label="Name">
@@ -3112,9 +3108,7 @@ function Guests({ data, up, side }) {
             </div>
           )}
         </Card>
-          ))}
-        </div>
-      )}
+      ))}
     </div>
   );
 }
