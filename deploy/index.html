@@ -193,9 +193,18 @@ const EMPTY = {
   budget: [],
   extraGifts: [],
   todos: [],
+  trash: [],
   bufferPct: 10,
   budgetTarget: "",
 };
+
+// deleted things rest in the trash for 30 days before purging
+const TRASH_DAYS = 30;
+const trashFresh = (t) => t && t.deletedAt && Date.now() - t.deletedAt < TRASH_DAYS * 86400000;
+const pushTrash = (data, kind, item) => [
+  { id: "t-" + uid(), kind, item, deletedAt: Date.now() },
+  ...(data.trash || []).filter(trashFresh),
+];
 
 // a guest with no event tags is invited to everything (the default)
 const guestInEvent = (g, evId) => !evId || !g.events || g.events.length === 0 || g.events.includes(evId);
@@ -2187,6 +2196,7 @@ function Planner({ role, onLogout, theme, toggleTheme, wedding }) {
   const normalize = (parsed) => {
     const next = { ...EMPTY, ...parsed, settings: { ...EMPTY.settings, ...(parsed.settings || {}) } };
     if (!next.events || next.events.length === 0) next.events = defaultEvents(next.settings);
+    next.trash = (next.trash || []).filter(trashFresh);
     return next;
   };
 
@@ -2817,7 +2827,10 @@ function Guests({ data, up, side }) {
   };
 
   const patch = (id, p) => up({ guests: data.guests.map((g) => (g.id === id ? { ...g, ...p } : g)) });
-  const remove = (id) => up({ guests: data.guests.filter((g) => g.id !== id) });
+  const remove = (id) => {
+    const g = data.guests.find((x) => x.id === id);
+    up({ guests: data.guests.filter((x) => x.id !== id), trash: pushTrash(data, "guest", g) });
+  };
 
   const pool = side ? data.guests.filter((g) => g.side === side) : data.guests;
 
@@ -3866,6 +3879,20 @@ function DataPanel({ data, up }) {
     img.src = url;
   };
 
+  // ---- recently deleted (30-day trash) ----
+  const TRASH_KEYS = { guest: "guests", budget: "budget", todo: "todos", caterer: "caterers", extraGift: "extraGifts" };
+  const TRASH_LABELS = { guest: "👤 Guest", budget: "💰 Vendor", todo: "✅ Task", caterer: "🍽 Caterer", extraGift: "💝 Gift" };
+  const trashName = (t) =>
+    t.kind === "budget" ? `${t.item.item}${t.item.category ? ` (${t.item.category})` : ""}` : t.kind === "todo" ? t.item.title : t.item.name;
+
+  const restoreTrash = (t) => {
+    const key = TRASH_KEYS[t.kind];
+    if (!key || !t.item) return;
+    up({ [key]: [t.item, ...(data[key] || [])], trash: (data.trash || []).filter((x) => x.id !== t.id) });
+    setMsg(`Restored ${trashName(t)}.`);
+  };
+  const purgeTrash = (t) => up({ trash: (data.trash || []).filter((x) => x.id !== t.id) });
+
   const doRestore = () => {
     const p = confirmRestore;
     up({ ...EMPTY, ...p, settings: { ...EMPTY.settings, ...(p.settings || {}) } });
@@ -4048,6 +4075,40 @@ function DataPanel({ data, up }) {
             <Btn kind="danger" small onClick={() => up({ settings: { ...data.settings, qrImage: "" } })}>
               Remove shared QR
             </Btn>
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <div style={{ ...serif, fontSize: 18, fontWeight: 600 }}>🗑️ Recently deleted</div>
+        <p className="text-xs mt-1 mb-3" style={{ color: C.muted }}>
+          Deleted guests, vendors, tasks, caterers and gifts rest here for {TRASH_DAYS} days before disappearing for
+          good — restore anything with one click.
+        </p>
+        {(data.trash || []).filter(trashFresh).length === 0 ? (
+          <span className="text-sm" style={{ color: C.muted }}>
+            Nothing in the trash. 🎉
+          </span>
+        ) : (
+          <div className="grid gap-2">
+            {(data.trash || []).filter(trashFresh).map((t) => (
+              <div key={t.id} className="flex flex-wrap items-center gap-2 p-2" style={{ background: C.soft, border: `1px solid ${C.line}`, borderRadius: 8 }}>
+                <Pill>{TRASH_LABELS[t.kind] || t.kind}</Pill>
+                <span className="text-sm font-medium">{trashName(t)}</span>
+                <span className="text-xs" style={{ color: C.muted }}>
+                  deleted {new Date(t.deletedAt).toLocaleDateString("en-MY", { day: "numeric", month: "short" })} ·
+                  purges in {Math.max(1, Math.ceil(TRASH_DAYS - (Date.now() - t.deletedAt) / 86400000))}d
+                </span>
+                <div className="ml-auto flex gap-2">
+                  <Btn small onClick={() => restoreTrash(t)}>
+                    ↩ Restore
+                  </Btn>
+                  <Btn kind="danger" small onClick={() => purgeTrash(t)}>
+                    Delete forever
+                  </Btn>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </Card>
@@ -4450,7 +4511,10 @@ function Catering({ data, up, stats }) {
     });
     setForm({ name: "", mode: form.mode, unitPrice: "", paxPerTable: 10 });
   };
-  const remove = (id) => up({ caterers: data.caterers.filter((c) => c.id !== id) });
+  const remove = (id) => {
+    const c = data.caterers.find((x) => x.id === id);
+    up({ caterers: data.caterers.filter((x) => x.id !== id), trash: pushTrash(data, "caterer", c) });
+  };
 
   const rows = data.caterers
     .filter((c) => !c.eventId || c.eventId === selEvent)
@@ -4644,7 +4708,10 @@ function Budget({ data, up, stats }) {
   };
 
   const patch = (id, p) => up({ budget: data.budget.map((b) => (b.id === id ? { ...b, ...p } : b)) });
-  const remove = (id) => up({ budget: data.budget.filter((b) => b.id !== id) });
+  const remove = (id) => {
+    const b = data.budget.find((x) => x.id === id);
+    up({ budget: data.budget.filter((x) => x.id !== id), trash: pushTrash(data, "budget", b) });
+  };
 
   // migration: old items used a paid checkbox instead of a paid amount
   const paidOf = (b) => num(b.paidAmount !== undefined ? b.paidAmount : b.paid ? b.actual : 0);
@@ -4908,7 +4975,10 @@ function Todos({ data, up }) {
     setForm({ title: "", due: "", assignee: form.assignee });
   };
   const patch = (id, p) => up({ todos: todos.map((t) => (t.id === id ? { ...t, ...p } : t)) });
-  const remove = (id) => up({ todos: todos.filter((t) => t.id !== id) });
+  const remove = (id) => {
+    const t = todos.find((x) => x.id === id);
+    up({ todos: todos.filter((x) => x.id !== id), trash: pushTrash(data, "todo", t) });
+  };
 
   const today = new Date(new Date().toDateString());
   const isOverdue = (t) => !t.done && t.due && new Date(t.due) < today;
@@ -5130,7 +5200,10 @@ function Gifts({ data, up, side }) {
     up({ extraGifts: [...data.extraGifts, { id: uid(), ...extra, side: side || extra.side, amount: num(extra.amount) }] });
     setExtra({ name: "", amount: "", method: "cash", note: "", side: side || extra.side });
   };
-  const removeExtra = (id) => up({ extraGifts: data.extraGifts.filter((x) => x.id !== id) });
+  const removeExtra = (id) => {
+    const x = data.extraGifts.find((e) => e.id === id);
+    up({ extraGifts: data.extraGifts.filter((e) => e.id !== id), trash: pushTrash(data, "extraGift", x) });
+  };
 
   const methods = ["cash", "bank transfer", "e-wallet", "cheque", "other"];
 
