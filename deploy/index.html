@@ -194,6 +194,7 @@ const EMPTY = {
   extraGifts: [],
   todos: [],
   bufferPct: 10,
+  budgetTarget: "",
 };
 
 // a guest with no event tags is invited to everything (the default)
@@ -2348,6 +2349,7 @@ function computeStats(data, side) {
   const gifts = g.reduce((s, x) => s + num(x.giftAmount), 0) + extras.reduce((s, x) => s + num(x.amount), 0);
   return {
     guestCount: g.length,
+    budgetTarget: num(data.budgetTarget),
     invitedPax,
     invitedBabies,
     invitedEating,
@@ -2484,11 +2486,15 @@ function Overview({ stats, data, setTab, side }) {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Stat label="Budget planned" value={RM(stats.budgeted)} />
+          <Stat
+            label="Budget planned"
+            value={RM(stats.budgetTarget || stats.budgeted)}
+            sub={stats.budgetTarget > 0 && stats.budgeted > 0 ? `${RM(stats.budgeted)} allocated` : undefined}
+          />
           <Stat
             label="Paid out"
             value={RM(stats.paidOut)}
-            tone={stats.actual > stats.budgeted && stats.budgeted > 0 ? C.red : C.ink}
+            tone={stats.actual > (stats.budgetTarget || stats.budgeted) && (stats.budgetTarget || stats.budgeted) > 0 ? C.red : C.ink}
             sub={`of ${RM(stats.actual)} committed${stats.balanceToPay > 0 ? ` · ${RM(stats.balanceToPay)} still to pay` : ""}`}
           />
           <Stat label="Gift money received" value={RM(stats.gifts)} tone={C.gold} />
@@ -4257,8 +4263,35 @@ function Budget({ data, up, stats }) {
         </div>
       )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Planned budget" value={RM(stats.budgeted)} />
-        <Stat label="Committed (totals)" value={RM(stats.actual)} tone={stats.actual > stats.budgeted && stats.budgeted > 0 ? C.red : C.ink} sub={stats.budgeted > 0 ? `${Math.round((stats.actual / stats.budgeted) * 100)}% of plan` : undefined} />
+        <Card style={{ padding: 16 }}>
+          <div className="text-xs uppercase tracking-wider mb-1" style={{ color: C.muted }}>
+            Planned budget
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-sm" style={{ color: C.muted }}>RM</span>
+            <input
+              style={{ ...inputStyle, fontSize: 18, fontWeight: 600, padding: "4px 8px" }}
+              type="number"
+              min="0"
+              value={data.budgetTarget || ""}
+              onChange={(e) => up({ budgetTarget: e.target.value })}
+              placeholder="set your total"
+            />
+          </div>
+          <div className="text-xs mt-1" style={{ color: C.muted }}>
+            {RM(stats.budgeted)} allocated across vendors
+          </div>
+        </Card>
+        <Stat
+          label="Committed (totals)"
+          value={RM(stats.actual)}
+          tone={stats.actual > (stats.budgetTarget || stats.budgeted) && (stats.budgetTarget || stats.budgeted) > 0 ? C.red : C.ink}
+          sub={
+            (stats.budgetTarget || stats.budgeted) > 0
+              ? `${Math.round((stats.actual / (stats.budgetTarget || stats.budgeted)) * 100)}% of plan`
+              : undefined
+          }
+        />
         <Stat label="Paid out" value={RM(stats.paidOut)} tone={C.green} />
         <Stat label="Balance to pay" value={RM(stats.balanceToPay)} tone={stats.balanceToPay > 0 ? C.gold : C.green} sub={stats.depositsToCollect > 0 ? `+ ${RM(stats.depositsToCollect)} deposits to collect back` : undefined} />
       </div>
