@@ -2090,6 +2090,12 @@ function Planner({ role, onLogout, theme, toggleTheme, wedding }) {
   const normalize = (parsed) => {
     const next = { ...EMPTY, ...parsed, settings: { ...EMPTY.settings, ...(parsed.settings || {}) } };
     if (!next.events || next.events.length === 0) next.events = defaultEvents(next.settings);
+    // repair icons mangled by an old data migration ("💒" -> "??")
+    next.events = next.events.map((e) => (/^\?+$/.test((e.icon || "").trim()) ? { ...e, icon: "💒" } : e));
+    // the default event follows the wedding date until it gets its own
+    if (next.events.length === 1 && !next.events[0].date && next.settings.date) {
+      next.events = [{ ...next.events[0], date: next.settings.date }];
+    }
     next.trash = (next.trash || []).filter(trashFresh);
     return next;
   };
