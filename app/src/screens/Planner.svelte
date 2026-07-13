@@ -11,6 +11,11 @@
   import EventBar from "../tabs/EventBar.svelte";
   import Overview from "../tabs/Overview.svelte";
   import Guests from "../tabs/guests/Guests.svelte";
+  import Catering from "../tabs/Catering.svelte";
+  import Budget from "../tabs/Budget.svelte";
+  import Todos from "../tabs/Todos.svelte";
+  import Gifts from "../tabs/Gifts.svelte";
+  import DayOf from "../tabs/DayOf.svelte";
 
   let { role, onLogout, wedding } = $props();
 
@@ -136,6 +141,16 @@
           <Overview {stats} setTab={(k) => (tab = k)} {side} />
         {:else if tab === "guests"}
           <Guests {side} />
+        {:else if tab === "catering" && isCouple}
+          <Catering />
+        {:else if tab === "budget" && isCouple}
+          <Budget {stats} />
+        {:else if tab === "todo" && isCouple}
+          <Todos />
+        {:else if tab === "gifts"}
+          <Gifts {side} />
+        {:else if tab === "dayof"}
+          <DayOf {side} />
         {:else}
           <!-- remaining tabs arrive in Phases C–E -->
           <Card>
