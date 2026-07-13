@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Jost:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* palette custom properties (--c-*) are set on <html> by App.svelte from the theme store */
+html,
+body {
+  background: var(--c-ivory);
+  margin: 0;
+}
+body {
+  font-family: 'Jost', system-ui, sans-serif;
+  color: var(--c-ink);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--c-gold) !important;
+}
+/* 16px stops iOS Safari zooming into focused fields */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* shared input look — replaces the legacy `inputStyle` JS object */
+.wb-input {
+  border: 1px solid var(--c-line);
+  background: var(--c-soft);
+  color: var(--c-ink);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+}
+
+.wb-serif {
+  font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+}
