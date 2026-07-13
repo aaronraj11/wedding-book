@@ -16,6 +16,8 @@
   import Todos from "../tabs/Todos.svelte";
   import Gifts from "../tabs/Gifts.svelte";
   import DayOf from "../tabs/DayOf.svelte";
+  import DataPanel from "../tabs/DataPanel.svelte";
+  import PasscodeManager from "../tabs/PasscodeManager.svelte";
 
   let { role, onLogout, wedding } = $props();
 
@@ -114,12 +116,7 @@
       </div>
 
       {#if showCodes && isCouple}
-        <!-- PasscodeManager arrives in Phase E -->
-        <Card className="mt-3">
-          <div class="text-sm" style="color:{C.muted}">
-            Passcode management is coming to the new app in a later phase — use the current live app for now.
-          </div>
-        </Card>
+        <PasscodeManager onClose={() => (showCodes = false)} />
       {/if}
 
       <EventBar {isCouple} />
@@ -151,15 +148,8 @@
           <Gifts {side} />
         {:else if tab === "dayof"}
           <DayOf {side} />
-        {:else}
-          <!-- remaining tabs arrive in Phases C–E -->
-          <Card>
-            <div class="wb-serif" style="font-size:20px;font-weight:600">{tabLabels[tab]}</div>
-            <p class="text-sm mt-1" style="color:{C.muted}">
-              This tab is coming to the new app in a later phase. Use the current live app for {tabLabels[tab]} in the
-              meantime — both apps share the same data.
-            </p>
-          </Card>
+        {:else if tab === "data" && isCouple}
+          <DataPanel />
         {/if}
       </div>
     </div>
