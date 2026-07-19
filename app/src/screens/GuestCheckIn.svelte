@@ -295,7 +295,8 @@
               Who's here? — tap names
             </div>
             <div class="flex flex-wrap gap-2">
-              {#each membersOf(sel) as m (m.name)}
+              <!-- keyed by index: real data can contain duplicate member names -->
+              {#each membersOf(sel) as m, i (i)}
                 {@const on = checkedMembers.includes(m.name)}
                 <button
                   onclick={() => toggleChecked(m, on)}

@@ -254,7 +254,8 @@
                   Who's coming? — tap names to toggle
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  {#each membersOf(sel) as m (m.name)}
+                  <!-- keyed by index: real data can contain duplicate member names -->
+                  {#each membersOf(sel) as m, i (i)}
                     {@const on = selMembers.includes(m.name)}
                     <button
                       onclick={() => toggleSelMember(m, on)}
@@ -273,7 +274,7 @@
                       Meal preference
                     </div>
                     <div class="grid gap-2 p-3" style="background:{C.soft};border:1px solid {C.line};border-radius:12px">
-                      {#each membersOf(sel).filter((m) => selMembers.includes(m.name) && m.type !== "baby") as m (m.name)}
+                      {#each membersOf(sel).filter((m) => selMembers.includes(m.name) && m.type !== "baby") as m, i (i)}
                         <div class="flex items-center gap-2 flex-wrap">
                           <span class="text-sm" style="min-width:120px">{m.name}</span>
                           {#each [["non", "Non-vegetarian"], ["veg", "Vegetarian 🥗"]] as [k, label] (k)}

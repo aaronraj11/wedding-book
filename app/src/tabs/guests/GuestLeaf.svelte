@@ -23,7 +23,8 @@
     {/if}
     {#if members.length > 0}
       <div class="w-full text-xs" style="padding-left:16px">
-        {#each members as m, i (m.name)}
+        <!-- keyed by index: real data can contain duplicate member names -->
+        {#each members as m, i (i)}
           {@const known = g.rsvp === "yes" && Array.isArray(g.confirmedMembers)}
           {@const coming = known ? g.confirmedMembers.includes(m.name) : null}
           <span style="color:{coming === true ? C.green : C.muted};text-decoration:{coming === false ? 'line-through' : 'none'}">

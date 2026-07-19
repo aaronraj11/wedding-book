@@ -488,7 +488,8 @@
         {#if membersOf(g).length > 0}
           <div class="flex flex-wrap items-center gap-1 mt-2">
             <span class="text-xs mr-1" style="color:{C.muted}">👨‍👩‍👧</span>
-            {#each membersOf(g) as m (m.name)}
+            <!-- keyed by index: real data can contain duplicate member names -->
+            {#each membersOf(g) as m, i (i)}
               {@const known = g.rsvp === "yes" && Array.isArray(g.confirmedMembers)}
               {@const coming = known ? g.confirmedMembers.includes(m.name) : null}
               <button
