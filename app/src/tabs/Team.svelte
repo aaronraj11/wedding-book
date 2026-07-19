@@ -5,6 +5,7 @@
   import { wd, up } from "../stores/wedding.svelte.js";
   import { defaultTeam } from "../lib/constants.js";
   import { uid } from "../lib/utils.js";
+  import { buildTeamHtml } from "../lib/exports.js";
   import Btn from "../components/Btn.svelte";
   import Card from "../components/Card.svelte";
   import Field from "../components/Field.svelte";
@@ -50,6 +51,14 @@
     [next[i], next[j]] = [next[j], next[i]];
     setTeam(next);
   }
+
+  // open a print-ready sheet (roster call-sheet, or one card per person)
+  function printTeam(mode) {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(buildTeamHtml($state.snapshot(wd.data), mode));
+    w.document.close();
+  }
 </script>
 
 <div class="grid gap-4">
@@ -58,6 +67,14 @@
     <Stat label="Assigned" value={filled} tone={C.green} sub={allRoles.length ? `${Math.round((filled / allRoles.length) * 100)}% filled` : undefined} />
     <Stat label="Still needed" value={allRoles.length - filled} tone={allRoles.length - filled > 0 ? C.gold : C.green} />
   </div>
+
+  {#if allRoles.length > 0}
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs" style="color:{C.muted}">🖨️ Print handouts:</span>
+      <Btn kind="ghost" small onclick={() => printTeam("roster")}>Team roster (call sheet)</Btn>
+      <Btn kind="ghost" small onclick={() => printTeam("cards")} disabled={filled === 0}>Individual cards ({filled})</Btn>
+    </div>
+  {/if}
 
   {#if team.length === 0}
     <Card>
@@ -101,31 +118,40 @@
 
       <div class="grid gap-2">
         {#each cat.roles as r (r.id)}
-          <div class="flex flex-wrap items-center gap-2 p-2" style="background:{(r.person || '').trim() ? C.greenSoft : C.soft};border:1px solid {C.line};border-radius:8px">
-            <input
-              class="text-sm font-semibold"
-              style="border:none;background:transparent;color:{C.ink};outline:none;width:210px"
-              value={r.title}
-              oninput={(e) => patchRole(cat.id, r.id, { title: e.target.value })}
-            />
-            <input
-              class="wb-input"
-              style="width:190px;padding:4px 8px"
-              placeholder="Who's doing it?"
-              value={r.person || ""}
-              oninput={(e) => patchRole(cat.id, r.id, { person: e.target.value })}
-            />
-            <input
-              class="wb-input"
-              style="width:150px;padding:4px 8px"
-              placeholder="Phone (optional)"
-              value={r.phone || ""}
-              oninput={(e) => patchRole(cat.id, r.id, { phone: e.target.value })}
-            />
-            {#if (r.person || "").trim()}<span class="text-xs" style="color:{C.green}">✓</span>{/if}
-            <div class="ml-auto">
-              <Btn kind="danger" small onclick={() => removeRole(cat, r.id)}>✕</Btn>
+          <div class="p-2" style="background:{(r.person || '').trim() ? C.greenSoft : C.soft};border:1px solid {C.line};border-radius:8px">
+            <div class="flex flex-wrap items-center gap-2">
+              <input
+                class="text-sm font-semibold"
+                style="border:none;background:transparent;color:{C.ink};outline:none;width:210px"
+                value={r.title}
+                oninput={(e) => patchRole(cat.id, r.id, { title: e.target.value })}
+              />
+              <input
+                class="wb-input"
+                style="width:190px;padding:4px 8px"
+                placeholder="Who's doing it?"
+                value={r.person || ""}
+                oninput={(e) => patchRole(cat.id, r.id, { person: e.target.value })}
+              />
+              <input
+                class="wb-input"
+                style="width:150px;padding:4px 8px"
+                placeholder="Phone (optional)"
+                value={r.phone || ""}
+                oninput={(e) => patchRole(cat.id, r.id, { phone: e.target.value })}
+              />
+              {#if (r.person || "").trim()}<span class="text-xs" style="color:{C.green}">✓</span>{/if}
+              <div class="ml-auto">
+                <Btn kind="danger" small onclick={() => removeRole(cat, r.id)}>✕</Btn>
+              </div>
             </div>
+            <input
+              class="wb-input"
+              style="width:100%;padding:4px 8px;margin-top:6px;font-size:13px"
+              placeholder="Task / duties (optional) — what this person does on the day"
+              value={r.task || ""}
+              oninput={(e) => patchRole(cat.id, r.id, { task: e.target.value })}
+            />
           </div>
         {/each}
         <div class="flex flex-wrap items-center gap-2">

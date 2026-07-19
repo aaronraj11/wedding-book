@@ -239,3 +239,109 @@ export function buildGuestListHtml(data, side) {
 </body>
 </html>`;
 }
+
+// ---------- team sheet: roster (call-sheet) or individual cards (handouts) ----------
+export function buildTeamHtml(data, mode) {
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const team = data.team || [];
+  const dateStr = data.settings.date
+    ? new Date(data.settings.date).toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : "";
+  const allRoles = team.flatMap((c) => c.roles.map((r) => ({ ...r, category: c.name })));
+  const assigned = allRoles.filter((r) => (r.person || "").trim());
+
+  const head = `
+  <div class="noprint"><button onclick="window.print()">🖨️ Print / Save as PDF</button></div>
+  <header>
+    <div class="flourish">✿&nbsp;❦&nbsp;✿</div>
+    <h1>${esc(data.settings.couple || "Our Wedding")}</h1>
+    <div class="subtitle">Wedding-Day Team${dateStr ? ` · ${esc(dateStr)}` : ""}</div>
+    <div class="totals"><b>${allRoles.length}</b> roles · <b>${assigned.length}</b> assigned across <b>${team.length}</b> teams</div>
+  </header>`;
+
+  let body;
+  if (mode === "cards") {
+    // one card per assigned role — cut along the lines and hand to each person
+    const cards = assigned
+      .map(
+        (r) => `<div class="card">
+          <div class="crole">${esc(r.title)}</div>
+          <div class="cname">${esc(r.person)}</div>
+          <div class="cmeta">${esc(r.category)}${r.phone ? ` · ${esc(r.phone)}` : ""}</div>
+          ${r.task && r.task.trim() ? `<div class="ctask">${esc(r.task)}</div>` : `<div class="ctask muted">—</div>`}
+          <div class="cfoot">${esc(data.settings.couple || "")}${dateStr ? ` · ${esc(dateStr)}` : ""}</div>
+        </div>`
+      )
+      .join("");
+    body = assigned.length
+      ? `<div class="cards">${cards}</div>`
+      : `<p class="empty">No roles have a person assigned yet — fill in names on the Team tab first.</p>`;
+  } else {
+    // roster: grouped by team/category
+    body = team
+      .map((c) => {
+        const rows = c.roles
+          .map(
+            (r) => `<tr>
+              <td>${esc(r.title)}</td>
+              <td>${(r.person || "").trim() ? `<b>${esc(r.person)}</b>` : `<span class="wbox"></span>`}</td>
+              <td>${esc(r.phone || "")}</td>
+              <td>${esc(r.task || "")}</td>
+            </tr>`
+          )
+          .join("");
+        return `<h2>${esc(c.name)} <span class="cnt">${c.roles.filter((r) => (r.person || "").trim()).length}/${c.roles.length}</span></h2>
+        <table>
+          <thead><tr><th>Role</th><th>Person</th><th>Phone</th><th>Task / duties</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="4">No roles in this team.</td></tr>`}</tbody>
+        </table>`;
+      })
+      .join("");
+    if (!team.length) body = `<p class="empty">No team set up yet — add roles on the Team tab first.</p>`;
+  }
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Team ${mode === "cards" ? "Cards" : "Roster"} — ${esc(data.settings.couple || "Our Wedding")}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&family=Jost:wght@400;500;600&display=swap');
+  * { box-sizing: border-box; }
+  body { font-family: 'Jost', system-ui, sans-serif; color: #443F3A; background: #fff; margin: 0; padding: 32px 36px; }
+  header { text-align: center; margin-bottom: 18px; }
+  .flourish { color: #BC9459; letter-spacing: 8px; font-size: 15px; }
+  h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 30px; font-weight: 700; margin: 6px 0 2px; }
+  .subtitle { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; color: #BC9459; font-size: 15px; }
+  .totals { font-size: 12px; color: #9A8E82; margin-top: 6px; }
+  .totals b { color: #6B8E7B; }
+  h2 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 20px; font-weight: 700; color: #6B8E7B; border-bottom: 1.5px solid #BC9459; padding-bottom: 3px; margin: 22px 0 8px; }
+  h2 .cnt { font-family: 'Jost', sans-serif; font-size: 11px; color: #9A8E82; font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; text-transform: uppercase; letter-spacing: 1px; font-size: 9.5px; color: #9A8E82; padding: 5px 6px; border-bottom: 1px solid #EFE7DB; }
+  td { border-bottom: 1px solid #F3EDE4; padding: 6px; vertical-align: top; }
+  .wbox { display: inline-block; height: 14px; min-width: 90px; border-bottom: 1px solid #D8CBB8; }
+  tr, .card { page-break-inside: avoid; }
+  .empty { color: #9A8E82; font-size: 13px; }
+  /* cards */
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .card { border: 1.5px dashed #D8CBB8; border-radius: 12px; padding: 16px 18px; min-height: 150px; display: flex; flex-direction: column; }
+  .crole { text-transform: uppercase; letter-spacing: 2px; font-size: 10px; color: #BC9459; font-weight: 600; }
+  .cname { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 26px; font-weight: 700; color: #443F3A; margin: 2px 0; }
+  .cmeta { font-size: 11px; color: #9A8E82; }
+  .ctask { font-size: 12.5px; color: #443F3A; margin-top: 10px; flex: 1; white-space: pre-wrap; }
+  .ctask.muted { color: #C4B8A6; }
+  .cfoot { font-size: 9.5px; color: #B0A698; text-align: right; margin-top: 8px; }
+  footer { margin-top: 24px; text-align: center; color: #B0A698; font-size: 10px; }
+  @media print { body { padding: 8mm 9mm; } .noprint { display: none; } }
+  .noprint { text-align: center; margin-bottom: 14px; }
+  .noprint button { background: #BC9459; color: #fff; border: none; border-radius: 999px; padding: 9px 24px; font-size: 13px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+  ${head}
+  ${body}
+  <footer>Printed ${new Date().toLocaleString("en-MY", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })} · Wedding Book 💍</footer>
+</body>
+</html>`;
+}
