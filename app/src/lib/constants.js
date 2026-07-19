@@ -56,8 +56,8 @@ export const DARK = {
 };
 
 export const ROLES = {
-  bride: { label: "Bride", icon: "🌸", side: null, tabs: ["overview", "guests", "catering", "budget", "todo", "gifts", "dayof", "data"] },
-  groom: { label: "Groom", icon: "🤵", side: null, tabs: ["overview", "guests", "catering", "budget", "todo", "gifts", "dayof", "data"] },
+  bride: { label: "Bride", icon: "🌸", side: null, tabs: ["overview", "guests", "catering", "budget", "todo", "team", "gifts", "dayof", "data"] },
+  groom: { label: "Groom", icon: "🤵", side: null, tabs: ["overview", "guests", "catering", "budget", "todo", "team", "gifts", "dayof", "data"] },
   brideAcct: { label: "Bride's Accountant", icon: "📒", side: "bride", tabs: ["overview", "guests", "gifts", "dayof"] },
   groomAcct: { label: "Groom's Accountant", icon: "📗", side: "groom", tabs: ["overview", "guests", "gifts", "dayof"] },
 };
@@ -70,9 +70,30 @@ export const EMPTY = {
   budget: [],
   extraGifts: [],
   todos: [],
+  team: [],
   trash: [],
   bufferPct: 10,
   budgetTarget: "",
+};
+
+// starter template for the wedding-day team hierarchy (🎭 Team tab).
+// fresh ids each call so weddings never share ids.
+export const defaultTeam = () => {
+  const cat = (name, titles) => ({
+    id: "tc-" + uid(),
+    name,
+    roles: titles.map((title) => ({ id: "tr-" + uid(), title, person: "", phone: "" })),
+  });
+  return [
+    cat("💍 Couple", ["Groom", "Bride"]),
+    cat("🌸 Bridal Party", ["Maid of Honour", "Bridesmaid 1", "Bridesmaid 2", "Bridesmaid 3", "Bridesmaid 4", "Bridesmaid 5", "Bridesmaid 6", "Bridesman"]),
+    cat("🤵 Groom's Party", ["Best Man", "Groomsman 1", "Groomsman 2", "Groomsman 3", "Groomsman 4", "Groomsman 5", "Groomsman 6"]),
+    cat("⛪ Ceremony", ["Emcee / Chairperson", "Pastor / Speaker"]),
+    cat("🎵 Worship Team", ["Worship Lead", "Singer 1", "Singer 2", "Pianist", "Acoustic Guitarist", "Drummer", "Bassist", "Electric Guitarist", "Violinist"]),
+    cat("📋 Coordination", ["Floor Manager", "Service Coordinator", "Assistant Coordinator", "Usher 1", "Usher 2"]),
+    cat("🎥 Production & AV", ["Designer", "Primary Tech (actual day)", "Sound 1", "Sound 2", "Video 1", "Video 2", "Video 3", "AV Room"]),
+    cat("🎪 Setup & Front of House", ["Deco Team Lead", "Registration Table 1", "Registration Table 2"]),
+  ];
 };
 
 export const GROUP_PRESETS = [

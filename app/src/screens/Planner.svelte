@@ -14,6 +14,7 @@
   import Catering from "../tabs/Catering.svelte";
   import Budget from "../tabs/Budget.svelte";
   import Todos from "../tabs/Todos.svelte";
+  import Team from "../tabs/Team.svelte";
   import Gifts from "../tabs/Gifts.svelte";
   import DayOf from "../tabs/DayOf.svelte";
   import DataPanel from "../tabs/DataPanel.svelte";
@@ -46,6 +47,7 @@
     catering: "Catering",
     budget: "Budget",
     todo: "✅ To-dos",
+    team: "🎭 Team",
     gifts: side ? `${cap(side)}'s Gift Money` : "Gift Money",
     dayof: "🎟️ Day-of",
     data: "💾 Data",
@@ -144,6 +146,8 @@
           <Budget {stats} />
         {:else if tab === "todo" && isCouple}
           <Todos />
+        {:else if tab === "team" && isCouple}
+          <Team />
         {:else if tab === "gifts"}
           <Gifts {side} />
         {:else if tab === "dayof"}

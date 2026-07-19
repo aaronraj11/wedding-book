@@ -119,6 +119,11 @@
     }));
     if (todoRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(todoRows), "To-dos");
 
+    const teamRows = (data.team || []).flatMap((c) =>
+      c.roles.map((r) => ({ Category: c.name, Role: r.title, Person: r.person || "", Phone: r.phone || "" }))
+    );
+    if (teamRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(teamRows), "Team");
+
     const catererRows = data.caterers.map((c) => ({
       Caterer: c.name,
       Pricing: c.mode === "table" ? "Per table" : "Per head",
