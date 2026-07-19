@@ -37,7 +37,7 @@ Deep-link a specific wedding with `?w=<code>` — e.g. `https://wedding-book.aar
 
 - **`app/`** — the application: `src/lib/` (pure helpers + Firebase storage adapter), `src/stores/` (theme, session, and the wedding data store with debounced saves + live sync), `src/components/`, `src/screens/` (Gate, Login, Planner, kiosks, AdminPanel), `src/tabs/` (the eight planner tabs).
 - **`deploy/`** — the built output (`cd app && npm run build`); this folder is what gets published.
-- **`wedding-planner.jsx`** / **`index.html`** (repo root) — the retired legacy React app, kept as reference/rollback.
+- **`legacy/`** — the retired single-file React app, kept as reference/rollback.
 - **Storage** — Firebase Firestore (project `wedding-planner-992a3`), anonymous auth. All docs live in the `kv` collection as `{ value: <JSON string> }`:
   - `w:<code>:data` — one wedding's full planning data
   - `w:<code>:accounts` — that wedding's role passcode hashes
