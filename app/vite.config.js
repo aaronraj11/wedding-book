@@ -1,12 +1,13 @@
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 
-// During migration we build to app/dist and the legacy app stays live in ../deploy.
-// At cutover (Phase F) outDir flips to "../deploy" with emptyOutDir: true.
+// Builds straight into ../deploy — the folder Cloudflare serves (wrangler.jsonc).
+// public/ carries manifest.json + icons so deploy/ stays self-contained.
 export default defineConfig({
   plugins: [svelte()],
   base: "./",
   build: {
-    outDir: "dist",
+    outDir: "../deploy",
+    emptyOutDir: true,
   },
 });

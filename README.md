@@ -33,11 +33,11 @@ Deep-link a specific wedding with `?w=<code>` — e.g. `https://wedding-book.aar
 
 ## Architecture
 
-Deliberately simple — no build step, no server:
+**Svelte 5 + Vite** (rewritten July 2026 from the original single-file React app):
 
-- **`wedding-planner.jsx`** — the entire app as one React component file. This is the source of truth for app code.
-- **`index.html`** — self-contained page that loads React, Babel, SheetJS, and Tailwind from CDNs and transpiles the JSX in the browser. Contains the Firebase config and a small `window.storage` adapter.
-- **`deploy/index.html`** — copy of `index.html`; this folder is what gets published (keeps the `.jsx` source out of the deployed site).
+- **`app/`** — the application: `src/lib/` (pure helpers + Firebase storage adapter), `src/stores/` (theme, session, and the wedding data store with debounced saves + live sync), `src/components/`, `src/screens/` (Gate, Login, Planner, kiosks, AdminPanel), `src/tabs/` (the eight planner tabs).
+- **`deploy/`** — the built output (`cd app && npm run build`); this folder is what gets published.
+- **`wedding-planner.jsx`** / **`index.html`** (repo root) — the retired legacy React app, kept as reference/rollback.
 - **Storage** — Firebase Firestore (project `wedding-planner-992a3`), anonymous auth. All docs live in the `kv` collection as `{ value: <JSON string> }`:
   - `w:<code>:data` — one wedding's full planning data
   - `w:<code>:accounts` — that wedding's role passcode hashes
@@ -45,7 +45,7 @@ Deliberately simple — no build step, no server:
   - `registry` — list of all weddings, read by master control
 - Sessions, theme, and last-opened wedding stay in `localStorage` per device.
 
-After editing `wedding-planner.jsx`, rebuild `index.html` by splicing the JSX between the HTML header (everything through `<script type="text/plain" id="app-src">`) and footer (from `const root = ReactDOM.createRoot…`), replacing line 1–2 imports with `const { useState, useEffect, useRef, useMemo } = React;` and dropping the `export default`. Then copy to `deploy/index.html`.
+After editing anything under `app/src/`, rebuild with `cd app && npm run build` — Vite outputs straight into `deploy/`. Dev server: `npm run dev` in `app/` (port 5173).
 
 ## Firebase setup (for a fresh deployment)
 
