@@ -91,8 +91,9 @@
     <Card style="padding:14px">
       <div class="flex flex-wrap items-center gap-2 mb-2">
         <input
-          class="wb-serif"
-          style="font-size:18px;font-weight:600;border:none;background:transparent;color:{C.ink};outline:none;min-width:200px;flex:1"
+          class="wb-serif wb-inline-edit"
+          title="Click to rename this category"
+          style="font-size:18px;font-weight:600;min-width:200px;flex:1"
           value={cat.name}
           oninput={(e) => patchCat(cat.id, { name: e.target.value })}
         />
@@ -121,8 +122,9 @@
           <div class="p-2" style="background:{(r.person || '').trim() ? C.greenSoft : C.soft};border:1px solid {C.line};border-radius:8px">
             <div class="flex flex-wrap items-center gap-2">
               <input
-                class="text-sm font-semibold"
-                style="border:none;background:transparent;color:{C.ink};outline:none;width:210px"
+                class="text-sm font-semibold wb-inline-edit"
+                title="Click to rename this role"
+                style="width:200px"
                 value={r.title}
                 oninput={(e) => patchRole(cat.id, r.id, { title: e.target.value })}
               />

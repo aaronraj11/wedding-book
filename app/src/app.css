@@ -49,3 +49,24 @@ textarea:focus {
 .wb-serif {
   font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
 }
+
+/* edit-in-place field: looks like text but a faint dashed border signals it's
+   editable; fills in solid on hover/focus so it clearly reads as an input */
+.wb-inline-edit {
+  border: 1px dashed var(--c-line);
+  background: transparent;
+  color: var(--c-ink);
+  border-radius: 6px;
+  padding: 3px 7px;
+  outline: none;
+  cursor: text;
+}
+.wb-inline-edit:hover {
+  border-style: solid;
+  background: var(--c-soft);
+}
+.wb-inline-edit:focus {
+  border-style: solid;
+  border-color: var(--c-gold);
+  background: var(--c-soft);
+}
