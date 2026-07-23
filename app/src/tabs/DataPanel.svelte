@@ -91,6 +91,7 @@
         "Contact Person": b.contactName || "",
         "Contact No": b.contactPhone || "",
         "Handled By": b.handledBy || "",
+        "Paid By": b.paidBy || "",
         "Budgeted (RM)": num(b.budgeted),
         "Total (RM)": num(b.actual),
         "Paid (RM)": paid,
@@ -98,6 +99,7 @@
         "Balance to Pay By": b.dueDate ? new Date(b.dueDate).toLocaleDateString("en-MY") : "",
         "Deposit to Collect (RM)": num(b.deposit) || "",
         "Deposit Collected": num(b.deposit) > 0 ? (b.depositCollected ? "Yes" : "No") : "",
+        Notes: b.note || "",
       };
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(budgetRows), "Budget");

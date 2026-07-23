@@ -34,10 +34,19 @@
     dueDate: "",
     deposit: "",
     handledBy: "",
+    paidBy: "",
+    note: "",
   });
   $effect(() => {
     if (!form.eventId && events[0]) form.eventId = events[0].id;
   });
+  let editId = $state(null); // vendor id whose details panel is open
+
+  // who's paying: bride/groom presets, plus anyone already used on other vendors
+  const PAYER_PRESETS = ["Bride", "Groom"];
+  const payerOptions = $derived(
+    [...new Set([...PAYER_PRESETS, ...(wd.data.budget || []).map((b) => (b.paidBy || "").trim()).filter(Boolean)])]
+  );
 
   function add() {
     if (!form.item.trim()) return;
@@ -58,10 +67,12 @@
           deposit: num(form.deposit),
           depositCollected: false,
           handledBy: form.handledBy.trim(),
+          paidBy: form.paidBy.trim(),
+          note: form.note.trim(),
         },
       ],
     });
-    form = { category: form.category, eventId: form.eventId, item: "", contactName: "", contactPhone: "", budgeted: "", actual: "", paidAmount: "", dueDate: "", deposit: "", handledBy: form.handledBy };
+    form = { category: form.category, eventId: form.eventId, item: "", contactName: "", contactPhone: "", budgeted: "", actual: "", paidAmount: "", dueDate: "", deposit: "", handledBy: form.handledBy, paidBy: form.paidBy, note: "" };
   }
 
   const patch = (id, p) => up({ budget: wd.data.budget.map((b) => (b.id === id ? { ...b, ...p } : b)) });
@@ -278,13 +289,28 @@
       <Field label="Handled by">
         <input class="wb-input" bind:value={form.handledBy} placeholder="e.g. Kenneth" />
       </Field>
+      <Field label="Paid by 💳">
+        <GroupSelect
+          value={form.paidBy}
+          options={payerOptions}
+          onChange={(v) => (form.paidBy = v)}
+          placeholder="e.g. Joan's dad"
+          noneLabel="— not set —"
+        />
+      </Field>
+    </div>
+    <div class="grid md:grid-cols-6 gap-3 items-end mt-3">
+      <Field label="Notes (optional)" className="md:col-span-5">
+        <input class="wb-input" bind:value={form.note} placeholder="e.g. 50% due after food tasting; includes delivery" onkeydown={(e) => e.key === "Enter" && add()} />
+      </Field>
       <div>
         <Btn onclick={add}>Add</Btn>
       </div>
     </div>
     <p class="text-xs mt-2" style="color:{C.muted}">
       Balance to pay is calculated automatically (Total − Paid). "Deposit to collect" is a refundable deposit the
-      vendor holds — tick it off once you get the money back after the event.
+      vendor holds — tick it off once you get the money back after the event. "Paid by" tracks whose money settles
+      this vendor — bride, groom, or anyone else.
     </p>
   </Card>
 
@@ -320,6 +346,9 @@
                 </span>
               {/if}
               {#if b.handledBy}<Pill>📋 {b.handledBy}</Pill>{/if}
+              {#if (b.paidBy || "").trim()}
+                <Pill tone={b.paidBy === "Bride" ? "gold" : b.paidBy === "Groom" ? "green" : "neutral"}>💳 {b.paidBy}</Pill>
+              {/if}
               <div class="ml-auto flex items-center gap-2">
                 {#if settled}
                   <Pill tone="green">Settled ✓</Pill>
@@ -330,9 +359,63 @@
                       : ""}
                   </Pill>
                 {/if}
+                <Btn kind="ghost" small onclick={() => (editId = editId === b.id ? null : b.id)}>
+                  {editId === b.id ? "Done" : "✏️ Edit"}
+                </Btn>
                 <Btn kind="danger" small onclick={() => remove(b.id)}>✕</Btn>
               </div>
             </div>
+            {#if (b.note || "").trim() && editId !== b.id}
+              <div class="text-xs mt-1" style="color:{C.muted}">📝 {b.note}</div>
+            {/if}
+            {#if editId === b.id}
+              <!-- edit panel: details that aren't in the money row -->
+              <div class="flex flex-wrap gap-3 mt-2 items-end p-3" style="background:{C.card};border:1px dashed {C.gold};border-radius:8px">
+                <Field label="Vendor / item">
+                  <input class="wb-input" style="width:220px" value={b.item} oninput={(e) => patch(b.id, { item: e.target.value })} />
+                </Field>
+                <Field label="Category" className="min-w-60">
+                  <GroupSelect
+                    value={b.category || ""}
+                    options={categoryOptions}
+                    onChange={(v) => patch(b.id, { category: v })}
+                    placeholder="Your own category"
+                    allowNone={false}
+                  />
+                </Field>
+                {#if events.length > 1}
+                  <Field label="Event">
+                    <select class="wb-input" style="width:170px" value={b.eventId || ""} onchange={(e) => patch(b.id, { eventId: e.target.value })}>
+                      <option value="">— untagged —</option>
+                      {#each events as e (e.id)}
+                        <option value={e.id}>{e.icon || "🎉"} {e.name}</option>
+                      {/each}
+                    </select>
+                  </Field>
+                {/if}
+                <Field label="Contact person">
+                  <input class="wb-input" style="width:150px" value={b.contactName || ""} oninput={(e) => patch(b.id, { contactName: e.target.value })} />
+                </Field>
+                <Field label="Contact no">
+                  <input class="wb-input" style="width:140px" value={b.contactPhone || ""} oninput={(e) => patch(b.id, { contactPhone: e.target.value })} />
+                </Field>
+                <Field label="Handled by">
+                  <input class="wb-input" style="width:130px" value={b.handledBy || ""} oninput={(e) => patch(b.id, { handledBy: e.target.value })} />
+                </Field>
+                <Field label="Paid by 💳" className="min-w-60">
+                  <GroupSelect
+                    value={b.paidBy || ""}
+                    options={payerOptions}
+                    onChange={(v) => patch(b.id, { paidBy: v })}
+                    placeholder="e.g. Joan's dad"
+                    noneLabel="— not set —"
+                  />
+                </Field>
+                <Field label="Notes" className="w-full">
+                  <input class="wb-input" value={b.note || ""} oninput={(e) => patch(b.id, { note: e.target.value })} placeholder="e.g. 50% due after food tasting; includes delivery" />
+                </Field>
+              </div>
+            {/if}
             <!-- line 2: money inputs -->
             <div class="flex flex-wrap items-end gap-3 mt-2">
               <Field label="Budgeted">
