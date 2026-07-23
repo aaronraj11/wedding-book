@@ -9,8 +9,16 @@
   import Field from "../components/Field.svelte";
   import Pill from "../components/Pill.svelte";
   import Stat from "../components/Stat.svelte";
+  import GroupSelect from "../components/GroupSelect.svelte";
 
   let { stats } = $props();
+
+  // preset categories plus any custom ones already in use, for the picker dropdown
+  const categoryOptions = $derived(
+    [...new Set([...BUDGET_CATS, ...(wd.data.budget || []).map((b) => b.category).filter(Boolean)])].sort((a, b) =>
+      a.localeCompare(b)
+    )
+  );
 
   const events = $derived(wd.data.events || []);
   let evFilter = $state("all");
@@ -224,11 +232,13 @@
     <div class="mb-3 wb-serif" style="font-size:20px;font-weight:600">Add a vendor / expense</div>
     <div class="grid md:grid-cols-6 gap-3 items-end">
       <Field label="Category">
-        <select class="wb-input" bind:value={form.category}>
-          {#each BUDGET_CATS as c (c)}
-            <option>{c}</option>
-          {/each}
-        </select>
+        <GroupSelect
+          value={form.category}
+          options={categoryOptions}
+          onChange={(v) => (form.category = v)}
+          placeholder="Your own category, e.g. Marquee & tent"
+          allowNone={false}
+        />
       </Field>
       {#if events.length > 1}
         <Field label="Event">

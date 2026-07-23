@@ -1,7 +1,15 @@
 <script>
-  // styled group picker: preset + existing groups in a normal select, with an
-  // "Other" escape hatch for custom tags
-  let { value, options, onChange } = $props();
+  // styled picker: preset + existing options in a normal select, with an
+  // "Other" escape hatch for typing a custom value. Reused for guest groups
+  // and budget categories, so the labels are configurable.
+  let {
+    value,
+    options,
+    onChange,
+    placeholder = "Your own tag, e.g. Pastors from FGA (use / to nest)",
+    noneLabel = "— no group —",
+    allowNone = true,
+  } = $props();
 
   // intentionally captures the INITIAL value only (legacy useState(() => …) semantics);
   // showCustom below re-derives against the live props
@@ -25,7 +33,7 @@
       }
     }}
   >
-    <option value="">— no group —</option>
+    {#if allowNone}<option value="">{noneLabel}</option>{/if}
     {#each options as o (o)}
       <option value={o}>{o}</option>
     {/each}
@@ -36,7 +44,7 @@
       class="wb-input"
       style="flex:1;min-width:150px"
       {value}
-      placeholder="Your own tag, e.g. Pastors from FGA (use / to nest)"
+      {placeholder}
       oninput={(e) => onChange(e.target.value)}
     />
   {/if}

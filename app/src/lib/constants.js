@@ -120,7 +120,8 @@ export const EVENT_ICONS = ["💒", "📸", "🌼", "⛪", "🍽️", "🎉", "�
 // palette for the svg donut charts
 export const CHART_COLORS = ["#6B8E7B", "#BC9459", "#8FA8C9", "#B48EAD", "#D9A66C", "#7FA8A0", "#B57373", "#9A8E82"];
 
-export const BUDGET_CATS = ["Venue & catering", "Attire & beauty", "Photography & video", "Decor & flowers", "Invitations", "Rings & jewellery", "Entertainment", "Dowry / hantaran", "Honeymoon", "Other"];
+// preset budget categories; the picker also offers "✏️ Other — type my own…" for custom ones
+export const BUDGET_CATS = ["Venue & catering", "Attire & beauty", "Photography & video", "Decor & flowers", "Invitations", "Rings & jewellery", "Entertainment", "Dowry / hantaran", "Honeymoon"];
 
 export const DEFAULT_TEMPLATE = `Dear {name} 💕
 
