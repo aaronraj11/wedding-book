@@ -19,6 +19,9 @@ export function buildSummaryHtml(data) {
     : "(date not set)";
 
   const paidOf = (b) => num(b.paidAmount !== undefined ? b.paidAmount : b.paid ? b.actual : 0);
+  // estimate vs actual: planned target falls back to the sum of line budgets
+  const plannedTarget = num(data.budgetTarget) || st.budgeted;
+  const leftVsPlan = plannedTarget - st.actual; // + = within plan, − = over
   const byCat = {};
   (data.budget || []).forEach((b) => {
     (byCat[b.category] = byCat[b.category] || []).push(b);
@@ -28,8 +31,24 @@ export function buildSummaryHtml(data) {
       const bud = items.reduce((s, x) => s + num(x.budgeted), 0);
       const tot = items.reduce((s, x) => s + num(x.actual), 0);
       const paid = items.reduce((s, x) => s + paidOf(x), 0);
-      return `<tr><td>${esc(cat)}</td><td class="r">${RM(bud)}</td><td class="r">${RM(tot)}</td><td class="r">${RM(paid)}</td></tr>`;
+      const diff = bud - tot;
+      return `<tr><td>${esc(cat)}</td><td class="r">${RM(bud)}</td><td class="r">${RM(tot)}</td><td class="r">${RM(paid)}</td><td class="r ${diff >= 0 ? "ok" : "bad"}">${diff >= 0 ? "" : "−"}${RM(Math.abs(diff))}</td></tr>`;
     })
+    .join("");
+
+  // wedding-day team (🎭 Team tab) — one row per role, grouped by category
+  const teamRows = (data.team || [])
+    .flatMap((c) =>
+      c.roles.map(
+        (r, i) => `<tr>
+          <td>${i === 0 ? `<b>${esc(c.name)}</b>` : ""}</td>
+          <td>${esc(r.title)}</td>
+          <td>${(r.person || "").trim() ? esc(r.person) : `<span class="sub">—</span>`}</td>
+          <td>${esc(r.phone || "")}</td>
+          <td>${esc(r.task || "")}</td>
+        </tr>`
+      )
+    )
     .join("");
 
   const rsvpLabel = (r) => (r === "yes" ? "Attending" : r === "no" ? "Declined" : "Pending");
@@ -80,6 +99,9 @@ export function buildSummaryHtml(data) {
   .stat .lbl { text-transform: uppercase; letter-spacing: 1px; font-size: 10px; color: #7C7466; }
   .stat .val { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 26px; font-weight: 700; color: #2E4A35; }
   .stat .sub, .sub { font-size: 11px; color: #7C7466; }
+  .ok { color: #2E7D4F; }
+  .bad { color: #B3402A; }
+  td.ok, td.bad { font-weight: 600; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th { text-align: left; text-transform: uppercase; letter-spacing: 1px; font-size: 10px; color: #7C7466; border-bottom: 1px solid #A9812F; padding: 6px 8px; }
   td { border-bottom: 1px solid #EFEAE0; padding: 6px 8px; vertical-align: top; }
@@ -111,16 +133,27 @@ export function buildSummaryHtml(data) {
   </div>
 
   <h2>Money</h2>
-  <div class="stats money">
-    ${stat("Budget committed", RM(st.actual), `planned ${RM(st.budgeted)} · paid ${RM(st.paidOut)}`)}
+  <div class="stats">
+    ${stat("Budget committed", RM(st.actual), `estimated ${RM(st.budgeted)} · paid ${RM(st.paidOut)}`)}
+    ${stat(
+      leftVsPlan >= 0 ? "Left of planned budget" : "Over planned budget",
+      `<span class="${leftVsPlan >= 0 ? "ok" : "bad"}">${RM(Math.abs(leftVsPlan))}</span>`,
+      `planned ${RM(plannedTarget)} − committed ${RM(st.actual)}`
+    )}
     ${stat("Gifts received", RM(st.gifts), `${RM(guestGiftTotal)} from guests · ${RM(extraTotal)} other`)}
     ${stat("Net cost after gifts", RM(st.net), st.net <= 0 ? "gifts covered the spend 🎉" : "spend minus gifts")}
   </div>
 
-  ${catRows ? `<h2>Budget by category</h2>
+  ${catRows ? `<h2>Budget by category — estimate vs. actual</h2>
   <table>
-    <thead><tr><th>Category</th><th class="r">Budgeted</th><th class="r">Total</th><th class="r">Paid</th></tr></thead>
+    <thead><tr><th>Category</th><th class="r">Budgeted</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Difference</th></tr></thead>
     <tbody>${catRows}</tbody>
+  </table>` : ""}
+
+  ${teamRows ? `<h2>Wedding-day team</h2>
+  <table>
+    <thead><tr><th>Team</th><th>Role</th><th>Person</th><th>Phone</th><th>Task / duties</th></tr></thead>
+    <tbody>${teamRows}</tbody>
   </table>` : ""}
 
   <h2>Guest list</h2>
