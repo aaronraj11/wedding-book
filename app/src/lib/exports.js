@@ -22,8 +22,11 @@ export function buildSummaryHtml(data) {
   // estimate vs actual: planned target falls back to the sum of line budgets
   const plannedTarget = num(data.budgetTarget) || st.budgeted;
   const leftVsPlan = plannedTarget - st.actual; // + = within plan, − = over
+  // budget breakdown counts confirmed items only (shortlisted are still-deciding candidates)
+  const confirmedBudget = (data.budget || []).filter((b) => b.status !== "shortlisted");
+  const shortlistedCount = (data.budget || []).length - confirmedBudget.length;
   const byCat = {};
-  (data.budget || []).forEach((b) => {
+  confirmedBudget.forEach((b) => {
     (byCat[b.category] = byCat[b.category] || []).push(b);
   });
   const catRows = Object.entries(byCat)

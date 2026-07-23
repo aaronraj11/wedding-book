@@ -36,35 +36,12 @@
     handledBy: "",
     paidBy: "",
     note: "",
+    status: "confirmed", // "confirmed" | "shortlisted"
   });
   $effect(() => {
     if (!form.eventId && events[0]) form.eventId = events[0].id;
   });
   let editId = $state(null); // vendor id whose details panel is open
-
-  // ---- vendor shortlist: compare quotes under one expense, choose the winner ----
-  let quotesOpen = $state(null); // budget id whose comparison panel is open
-  let qform = $state({ name: "", price: "", note: "" });
-
-  function toggleQuotes(id) {
-    quotesOpen = quotesOpen === id ? null : id;
-    qform = { name: "", price: "", note: "" };
-  }
-  function addQuote(b) {
-    if (!qform.name.trim() || !num(qform.price)) return;
-    patch(b.id, { quotes: [...(b.quotes || []), { id: uid(), name: qform.name.trim(), price: num(qform.price), note: qform.note.trim() }] });
-    qform = { name: "", price: "", note: "" };
-  }
-  function removeQuote(b, qid) {
-    const p = { quotes: (b.quotes || []).filter((q) => q.id !== qid) };
-    if (b.chosenQuoteId === qid) p.chosenQuoteId = "";
-    patch(b.id, p);
-  }
-  // choosing a quote makes it the expense's actual cost; choosing again un-picks it
-  function chooseQuote(b, q) {
-    if (b.chosenQuoteId === q.id) patch(b.id, { chosenQuoteId: "" });
-    else patch(b.id, { chosenQuoteId: q.id, actual: num(q.price) });
-  }
 
   // who's paying: bride/groom presets, plus anyone already used on other vendors
   const PAYER_PRESETS = ["Bride", "Groom"];
@@ -93,11 +70,15 @@
           handledBy: form.handledBy.trim(),
           paidBy: form.paidBy.trim(),
           note: form.note.trim(),
+          status: form.status,
         },
       ],
     });
-    form = { category: form.category, eventId: form.eventId, item: "", contactName: "", contactPhone: "", budgeted: "", actual: "", paidAmount: "", dueDate: "", deposit: "", handledBy: form.handledBy, paidBy: form.paidBy, note: "" };
+    form = { category: form.category, eventId: form.eventId, item: "", contactName: "", contactPhone: "", budgeted: "", actual: "", paidAmount: "", dueDate: "", deposit: "", handledBy: form.handledBy, paidBy: form.paidBy, note: "", status: form.status };
   }
+
+  // items with no status (created before this feature) count as confirmed
+  const isShortlisted = (b) => b.status === "shortlisted";
 
   const patch = (id, p) => up({ budget: wd.data.budget.map((b) => (b.id === id ? { ...b, ...p } : b)) });
   function remove(id) {
@@ -115,27 +96,31 @@
   };
 
   const visible = $derived(wd.data.budget.filter((b) => evFilter === "all" || b.eventId === evFilter || (!b.eventId && evFilter === "untagged")));
-  const filteredTotal = $derived(visible.reduce((s, x) => s + num(x.actual), 0));
-  const filteredPaid = $derived(visible.reduce((s, x) => s + paidOf(x), 0));
+  const filteredTotal = $derived(visible.filter((b) => !isShortlisted(b)).reduce((s, x) => s + num(x.actual), 0));
+  const filteredPaid = $derived(visible.filter((b) => !isShortlisted(b)).reduce((s, x) => s + paidOf(x), 0));
 
-  const byCat = $derived.by(() => {
+  // group by category within a status bucket
+  const groupByCat = (list) => {
     const map = {};
-    visible.forEach((b) => {
+    list.forEach((b) => {
       (map[b.category] = map[b.category] || []).push(b);
     });
-    return map;
-  });
+    return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
+  };
+  const confirmedByCat = $derived(groupByCat(visible.filter((b) => !isShortlisted(b))));
+  const shortlistedByCat = $derived(groupByCat(visible.filter(isShortlisted)));
+  const shortlistedTotal = $derived(visible.filter(isShortlisted).reduce((s, x) => s + num(x.actual), 0));
 
-  // ---- estimate vs actual (how much more to spend) ----
+  // ---- estimate vs actual (how much more to spend) — confirmed items only ----
   // planned target falls back to the sum of line budgets when no overall total is set
   const plannedTarget = $derived(num(wd.data.budgetTarget) || stats.budgeted);
   const leftVsPlan = $derived(plannedTarget - stats.actual); // + = still within plan, − = over
   const estVariance = $derived(stats.budgeted - stats.actual); // + = under estimates, − = over
 
-  // per-category: estimated (Σ budgeted) vs actual (Σ committed), across all events
+  // per-category: estimated (Σ budgeted) vs actual (Σ committed), confirmed items, all events
   const catEstimate = $derived.by(() => {
     const map = {};
-    (wd.data.budget || []).forEach((b) => {
+    (wd.data.budget || []).filter((b) => !isShortlisted(b)).forEach((b) => {
       const m = (map[b.category] = map[b.category] || { budgeted: 0, actual: 0 });
       m.budgeted += num(b.budgeted);
       m.actual += num(b.actual);
@@ -324,8 +309,20 @@
       </Field>
     </div>
     <div class="grid md:grid-cols-6 gap-3 items-end mt-3">
-      <Field label="Notes (optional)" className="md:col-span-5">
+      <Field label="Notes (optional)" className="md:col-span-3">
         <input class="wb-input" bind:value={form.note} placeholder="e.g. 50% due after food tasting; includes delivery" onkeydown={(e) => e.key === "Enter" && add()} />
+      </Field>
+      <Field label="Add as" className="md:col-span-2">
+        <div class="flex" style="border:1px solid {C.line};border-radius:8px;overflow:hidden">
+          {#each [["confirmed", "✅ Confirmed"], ["shortlisted", "🔍 Shortlist"]] as [k, label] (k)}
+            <button
+              onclick={() => (form.status = k)}
+              style="flex:1;padding:8px 6px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:{form.status === k ? (k === 'confirmed' ? C.green : C.gold) : C.card};color:{form.status === k ? '#fff' : C.muted}"
+            >
+              {label}
+            </button>
+          {/each}
+        </div>
       </Field>
       <div>
         <Btn onclick={add}>Add</Btn>
@@ -338,13 +335,38 @@
     </p>
   </Card>
 
-  {#if Object.keys(byCat).length === 0}
+  {#if visible.length === 0}
     <Card>
       <span style="color:{C.muted}">No vendors yet. Common first entries: venue deposit, photographer, bridal package.</span>
     </Card>
   {/if}
 
-  {#each Object.entries(byCat) as [cat, items] (cat)}
+  {#if confirmedByCat.length > 0}
+    <div class="wb-serif" style="font-size:22px;font-weight:700;color:{C.green};border-bottom:2px solid {C.green};padding-bottom:3px">
+      ✅ Confirmed
+    </div>
+    {#each confirmedByCat as [cat, items] (cat)}
+      {@render categoryCard(cat, items)}
+    {/each}
+  {/if}
+
+  {#if shortlistedByCat.length > 0}
+    <div>
+      <div class="wb-serif" style="font-size:22px;font-weight:700;color:{C.gold};border-bottom:2px solid {C.gold};padding-bottom:3px">
+        🔍 Shortlisted — still deciding
+      </div>
+      <p class="text-xs mt-1" style="color:{C.muted}">
+        Options you're comparing — they don't count toward your committed spend ({RM(shortlistedTotal)} if you chose
+        them all). Hit ✓ Confirm on the one you pick.
+      </p>
+    </div>
+    {#each shortlistedByCat as [cat, items] (cat)}
+      {@render categoryCard(cat, items)}
+    {/each}
+  {/if}
+</div>
+
+{#snippet categoryCard(cat, items)}
     {@const catTotal = items.reduce((s, x) => s + num(x.actual), 0)}
     {@const catPaid = items.reduce((s, x) => s + paidOf(x), 0)}
     <Card style="padding:14px">
@@ -357,9 +379,6 @@
           {@const bal = balanceOf(b)}
           {@const settled = num(b.actual) > 0 && bal <= 0}
           {@const overdue = isOverdue(b)}
-          {@const quotes = b.quotes || []}
-          {@const chosenQ = quotes.find((q) => q.id === b.chosenQuoteId)}
-          {@const cheapest = quotes.length ? Math.min(...quotes.map((q) => num(q.price))) : null}
           <div class="p-3" style="background:{C.soft};border:1px solid {overdue ? C.red : C.line};border-radius:8px">
             <!-- line 1: name, contact, handled by, status -->
             <div class="flex flex-wrap items-center gap-2">
@@ -376,13 +395,12 @@
               {#if (b.paidBy || "").trim()}
                 <Pill tone={b.paidBy === "Bride" ? "gold" : b.paidBy === "Groom" ? "green" : "neutral"}>💳 {b.paidBy}</Pill>
               {/if}
-              {#if chosenQ}
-                <Pill tone="gold">🏷 {chosenQ.name}</Pill>
-              {/if}
               <div class="ml-auto flex items-center gap-2">
-                <Btn kind="ghost" small onclick={() => toggleQuotes(b.id)}>
-                  {quotesOpen === b.id ? "Done" : quotes.length ? `💬 Quotes (${quotes.length})` : "💬 Compare quotes"}
-                </Btn>
+                {#if isShortlisted(b)}
+                  <Btn kind="gold" small onclick={() => patch(b.id, { status: "confirmed" })}>✓ Confirm</Btn>
+                {:else}
+                  <Btn kind="ghost" small onclick={() => patch(b.id, { status: "shortlisted" })}>🔍 Shortlist</Btn>
+                {/if}
                 {#if settled}
                   <Pill tone="green">Settled ✓</Pill>
                 {:else if bal > 0}
@@ -449,56 +467,6 @@
                 </Field>
               </div>
             {/if}
-            {#if quotesOpen === b.id}
-              <!-- vendor shortlist: options for this expense, cheapest first -->
-              <div class="mt-2 p-3" style="background:{C.card};border:1px dashed {C.gold};border-radius:8px">
-                <div class="text-xs mb-2" style="color:{C.muted}">
-                  Collect options for <b style="color:{C.ink}">{b.item}</b>, compare, then <b>Choose</b> one — its price
-                  becomes this expense's total.{num(b.budgeted) > 0 ? ` Your estimate: ${RM(b.budgeted)}.` : ""}
-                </div>
-                <div class="grid gap-2">
-                  {#each quotes.slice().sort((a, b2) => num(a.price) - num(b2.price)) as q (q.id)}
-                    {@const isChosen = b.chosenQuoteId === q.id}
-                    {@const vsBudget = num(b.budgeted) > 0 ? num(b.budgeted) - num(q.price) : null}
-                    <div
-                      class="flex flex-wrap items-center gap-2 p-2"
-                      style="border:1px solid {isChosen ? C.green : num(q.price) === cheapest ? C.gold : C.line};background:{isChosen ? C.greenSoft : num(q.price) === cheapest ? C.goldSoft : C.soft};border-radius:8px"
-                    >
-                      <span class="text-sm font-semibold">{q.name}</span>
-                      {#if num(q.price) === cheapest && quotes.length > 1}<Pill tone="gold">Best price</Pill>{/if}
-                      {#if q.note}<span class="text-xs" style="color:{C.muted}">{q.note}</span>{/if}
-                      <div class="ml-auto flex items-center gap-2 flex-wrap">
-                        <span class="text-sm font-bold">{RM(q.price)}</span>
-                        {#if vsBudget !== null}
-                          <span class="text-xs" style="color:{vsBudget >= 0 ? C.green : C.red};font-weight:600">
-                            {vsBudget >= 0 ? `${RM(vsBudget)} under budget` : `${RM(-vsBudget)} over budget`}
-                          </span>
-                        {/if}
-                        <button
-                          onclick={() => chooseQuote(b, q)}
-                          style="padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid {isChosen ? C.green : C.line};background:{isChosen ? C.green : 'transparent'};color:{isChosen ? C.onGreen : C.muted}"
-                        >
-                          {isChosen ? "✓ Chosen" : "Choose"}
-                        </button>
-                        <Btn kind="danger" small onclick={() => removeQuote(b, q.id)}>✕</Btn>
-                      </div>
-                    </div>
-                  {/each}
-                  <div class="flex flex-wrap items-end gap-2">
-                    <Field label="Vendor / option">
-                      <input class="wb-input" style="width:190px;padding:5px 8px" placeholder="e.g. Hilton PJ" bind:value={qform.name} onkeydown={(e) => e.key === "Enter" && addQuote(b)} />
-                    </Field>
-                    <Field label="Price (RM)">
-                      <input class="wb-input" style="width:110px;padding:5px 8px" type="number" min="0" bind:value={qform.price} onkeydown={(e) => e.key === "Enter" && addQuote(b)} />
-                    </Field>
-                    <Field label="Note (optional)">
-                      <input class="wb-input" style="width:220px;padding:5px 8px" placeholder="e.g. incl. breakfast, 2 nights" bind:value={qform.note} onkeydown={(e) => e.key === "Enter" && addQuote(b)} />
-                    </Field>
-                    <Btn small onclick={() => addQuote(b)}>＋ Add option</Btn>
-                  </div>
-                </div>
-              </div>
-            {/if}
             <!-- line 2: money inputs -->
             <div class="flex flex-wrap items-end gap-3 mt-2">
               <Field label="Budgeted">
@@ -542,5 +510,4 @@
         {/each}
       </div>
     </Card>
-  {/each}
-</div>
+{/snippet}

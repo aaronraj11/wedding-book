@@ -16,11 +16,14 @@ export function computeStats(data, side) {
   const confirmedEating = Math.max(0, confirmedPax - confirmedBabies);
   const pending = g.filter((x) => x.rsvp === "pending").length;
   const declined = g.filter((x) => x.rsvp === "no").length;
-  const budgeted = data.budget.reduce((s, x) => s + num(x.budgeted), 0);
-  const actual = data.budget.reduce((s, x) => s + num(x.actual), 0);
-  const paidOut = data.budget.reduce((s, x) => s + num(x.paidAmount !== undefined ? x.paidAmount : x.paid ? x.actual : 0), 0);
+  // shortlisted budget items are candidates being compared — they don't count as
+  // committed spend until confirmed (items with no status are treated as confirmed)
+  const confirmedBudget = data.budget.filter((x) => x.status !== "shortlisted");
+  const budgeted = confirmedBudget.reduce((s, x) => s + num(x.budgeted), 0);
+  const actual = confirmedBudget.reduce((s, x) => s + num(x.actual), 0);
+  const paidOut = confirmedBudget.reduce((s, x) => s + num(x.paidAmount !== undefined ? x.paidAmount : x.paid ? x.actual : 0), 0);
   const balanceToPay = Math.max(0, actual - paidOut);
-  const depositsToCollect = data.budget.reduce((s, x) => s + (x.depositCollected ? 0 : num(x.deposit)), 0);
+  const depositsToCollect = confirmedBudget.reduce((s, x) => s + (x.depositCollected ? 0 : num(x.deposit)), 0);
   const extras = side ? data.extraGifts.filter((x) => (x.side || "bride") === side) : data.extraGifts;
   const gifts = g.reduce((s, x) => s + num(x.giftAmount), 0) + extras.reduce((s, x) => s + num(x.amount), 0);
   return {
