@@ -100,6 +100,9 @@
         "Deposit to Collect (RM)": num(b.deposit) || "",
         "Deposit Collected": num(b.deposit) > 0 ? (b.depositCollected ? "Yes" : "No") : "",
         Notes: b.note || "",
+        "Options Compared": (b.quotes || [])
+          .map((q) => `${b.chosenQuoteId === q.id ? "✓ " : ""}${q.name}: RM ${num(q.price)}`)
+          .join("; "),
       };
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(budgetRows), "Budget");
