@@ -82,6 +82,25 @@
     });
     return map;
   });
+
+  // ---- estimate vs actual (how much more to spend) ----
+  // planned target falls back to the sum of line budgets when no overall total is set
+  const plannedTarget = $derived(num(wd.data.budgetTarget) || stats.budgeted);
+  const leftVsPlan = $derived(plannedTarget - stats.actual); // + = still within plan, − = over
+  const estVariance = $derived(stats.budgeted - stats.actual); // + = under estimates, − = over
+
+  // per-category: estimated (Σ budgeted) vs actual (Σ committed), across all events
+  const catEstimate = $derived.by(() => {
+    const map = {};
+    (wd.data.budget || []).forEach((b) => {
+      const m = (map[b.category] = map[b.category] || { budgeted: 0, actual: 0 });
+      m.budgeted += num(b.budgeted);
+      m.actual += num(b.actual);
+    });
+    return Object.entries(map)
+      .map(([cat, v]) => ({ cat, budgeted: v.budgeted, actual: v.actual, diff: v.budgeted - v.actual }))
+      .sort((a, b) => a.cat.localeCompare(b.cat));
+  });
 </script>
 
 <div class="grid gap-4">
@@ -135,6 +154,71 @@
       sub={stats.depositsToCollect > 0 ? `+ ${RM(stats.depositsToCollect)} deposits to collect back` : undefined}
     />
   </div>
+
+  {#if (wd.data.budget || []).length > 0}
+    <Card>
+      <div class="wb-serif" style="font-size:20px;font-weight:600">📊 Estimate vs. actual</div>
+      <p class="text-xs mt-1 mb-3" style="color:{C.muted}">
+        How your real costs compare to what you planned — so you can see roughly how much is still left to spend.
+      </p>
+
+      <!-- headline: how much of the planned budget is left -->
+      <div class="p-3 mb-3" style="background:{leftVsPlan >= 0 ? C.greenSoft : C.redSoft};border:1px solid {leftVsPlan >= 0 ? C.green : C.red};border-radius:12px">
+        <div class="text-xs uppercase tracking-wider" style="color:{C.muted}">
+          {leftVsPlan >= 0 ? "Left of your planned budget" : "Over your planned budget"}
+        </div>
+        <div class="wb-serif" style="font-size:30px;font-weight:700;color:{leftVsPlan >= 0 ? C.green : C.red}">
+          {RM(Math.abs(leftVsPlan))}
+        </div>
+        <div class="text-xs mt-1" style="color:{C.muted}">
+          Planned {RM(plannedTarget)} − committed {RM(stats.actual)}{num(wd.data.budgetTarget) ? "" : " (no overall total set — using the sum of your line budgets)"}
+        </div>
+      </div>
+
+      <!-- estimated (line budgets) vs actual committed -->
+      <div class="grid grid-cols-3 gap-3 mb-3">
+        <div>
+          <div class="text-xs uppercase tracking-wider" style="color:{C.muted}">Estimated</div>
+          <div class="text-lg" style="font-weight:600;color:{C.ink}">{RM(stats.budgeted)}</div>
+          <div class="text-xs" style="color:{C.muted}">sum of line budgets</div>
+        </div>
+        <div>
+          <div class="text-xs uppercase tracking-wider" style="color:{C.muted}">Actual cost</div>
+          <div class="text-lg" style="font-weight:600;color:{C.ink}">{RM(stats.actual)}</div>
+          <div class="text-xs" style="color:{C.muted}">committed totals</div>
+        </div>
+        <div>
+          <div class="text-xs uppercase tracking-wider" style="color:{C.muted}">Difference</div>
+          <div class="text-lg" style="font-weight:600;color:{estVariance >= 0 ? C.green : C.red}">{RM(Math.abs(estVariance))}</div>
+          <div class="text-xs" style="color:{C.muted}">{estVariance >= 0 ? "under estimate" : "over estimate"}</div>
+        </div>
+      </div>
+
+      <!-- per-category breakdown -->
+      {#if catEstimate.length > 0}
+        <div style="border-top:1px solid {C.line}">
+          <div class="grid gap-1 mt-2" style="font-size:13px">
+            <div class="flex items-center gap-2 text-xs uppercase tracking-wider" style="color:{C.muted}">
+              <span style="flex:1">Category</span>
+              <span style="width:90px;text-align:right">Estimated</span>
+              <span style="width:90px;text-align:right">Actual</span>
+              <span style="width:90px;text-align:right">Difference</span>
+            </div>
+            {#each catEstimate as c (c.cat)}
+              <div class="flex items-center gap-2 py-1" style="border-top:1px solid {C.line}">
+                <span style="flex:1;color:{C.ink}">{c.cat}</span>
+                <span style="width:90px;text-align:right;color:{C.muted}">{RM(c.budgeted)}</span>
+                <span style="width:90px;text-align:right;color:{C.ink}">{RM(c.actual)}</span>
+                <span style="width:90px;text-align:right;font-weight:600;color:{c.diff >= 0 ? C.green : C.red}">
+                  {c.diff >= 0 ? "" : "−"}{RM(Math.abs(c.diff))}
+                </span>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+    </Card>
+  {/if}
 
   <Card>
     <div class="mb-3 wb-serif" style="font-size:20px;font-weight:600">Add a vendor / expense</div>
